@@ -24,7 +24,9 @@ export type ConfigTypes = {
     };
     cors?: {
       enabled: boolean;
-      origins: string[];
+      origins: string | string[];
+      methods: string | string[];
+      allowedHeaders: string | string[];
     };
   };
   logging?: {

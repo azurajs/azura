@@ -16,6 +16,8 @@ import { Router } from "./Router";
 import type { RequestHandler } from "../types/common.type";
 import { getIP } from "./utils/GetIp";
 import type { Handler } from "./utils/route/Node";
+import { cors } from "../shared/plugins/CORSPlugin";
+import { rateLimit } from "../shared/plugins/RateLimitPlugin";
 
 export { createLoggingMiddleware } from "../middleware/LoggingMiddleware";
 
@@ -48,11 +50,29 @@ export class AzuraClient {
 
   private async init() {
     this.port = await getOpenPort(this.opts.server?.port || 3000);
+
     if (this.opts.server?.cluster && cluster.isPrimary) {
       for (let i = 0; i < os.cpus().length; i++) cluster.fork();
       cluster.on("exit", () => cluster.fork());
       return;
     }
+
+    if (this.opts.plugins?.cors?.enabled) {
+      cors({
+        origin: this.opts.plugins.cors.origins,
+        methods: this.opts.plugins.cors.methods,
+        allowedHeaders: this.opts.plugins.cors.allowedHeaders,
+      });
+
+      logger("info", "CORS plugin enabled");
+    }
+
+    if (this.opts.plugins?.rateLimit?.enabled) {
+      rateLimit(this.opts.plugins.rateLimit.limit, this.opts.plugins.rateLimit.timeframe);
+
+      logger("info", "Rate Limit plugin enabled");
+    }
+
     this.server = http.createServer();
     this.server.on("request", this.handle.bind(this));
   }
