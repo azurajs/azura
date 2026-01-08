@@ -49,7 +49,7 @@ export class AzuraClient {
   }
 
   private async init() {
-    this.port = await getOpenPort(this.opts.server?.port || 3000);
+    this.port = this.opts.server?.port || 3000;
 
     if (this.opts.server?.cluster && cluster.isPrimary) {
       for (let i = 0; i < os.cpus().length; i++) cluster.fork();
@@ -95,22 +95,25 @@ export class AzuraClient {
   public async listen(port = this.port) {
     await this.initPromise;
 
-    try {
-      if (!this.server) {
-        logger("error", "Server not initialized");
-        return;
-      }
-
-      const who = cluster.isPrimary ? "master" : "worker";
-      this.server.listen(port, () =>
-        logger("info", `[${who}] listening on http://localhost:${port}`)
-      );
-
-      if (this.opts.server?.ipHost) getIP(port);
-    } catch (error: Error | any) {
-      logger("error", "Server failed to start: " + error?.message || String(error));
-      process.exit(1);
+    if (!this.server) {
+      logger("error", "Server not initialized");
+      return;
     }
+
+    this.server.on("error", (error: NodeJS.ErrnoException) => {
+      if (error.code === "EADDRINUSE") {
+        logger("error", `❌ Port ${port} is already in use. Please choose a different port.`);
+      } else {
+        logger("error", "Server failed to start: " + (error?.message || String(error)));
+      }
+      process.exit(1);
+    });
+
+    const who = cluster.isPrimary ? "master" : "worker";
+    this.server.listen(port, () => {
+      logger("info", `[${who}] listening on http://localhost:${port}`);
+      if (this.opts.server?.ipHost) getIP(port);
+    });
   }
 
   private async handle(rawReq: RequestServer, rawRes: ResponseServer) {
