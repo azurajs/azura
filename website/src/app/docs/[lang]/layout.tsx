@@ -9,7 +9,7 @@ export default async function Layout({
   params,
 }: {
   children: ReactNode;
-  params: Promise<{ lang: "en" | "pt" }>;
+  params: Promise<{ lang: string }>;
 }) {
   const { lang } = await params;
   const source = getSource(lang);
