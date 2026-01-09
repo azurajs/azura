@@ -1,0 +1,469 @@
+---
+title: Cookies
+description: Trabalhe com cookies HTTP no AzuraJS
+icon: Cookie
+---
+
+# Cookies 🍪
+
+AzuraJS fornece utilitários para trabalhar com cookies HTTP de forma fácil e type-safe.
+
+## Ler Cookies 📖
+
+Use `parseCookiesHeader` para parsear o cabeçalho Cookie:
+
+```typescript
+import { parseCookiesHeader } from "azurajs";
+
+@Get("/profile")
+getProfile(@Headers("cookie") cookieHeader: string) {
+  const cookies = parseCookiesHeader(cookieHeader);
+  
+  const sessionId = cookies.sessionId;
+  const theme = cookies.theme;
+  
+  return { sessionId, theme };
+}
+```
+
+## Definir Cookies ✍️
+
+Use `serializeCookie` para criar cabeçalhos Set-Cookie:
+
+```typescript
+import { serializeCookie } from "azurajs";
+
+@Post("/login")
+login(@Body() credentials: any, @Res() res: ResponseServer) {
+  // Autenticar usuário
+  const user = authenticate(credentials);
+  
+  // Definir cookie de sessão
+  const cookie = serializeCookie("sessionId", user.sessionId, {
+    httpOnly: true,
+    secure: true,
+    maxAge: 3600,  // 1 hora
+    path: "/"
+  });
+  
+  res.setHeader("Set-Cookie", cookie);
+  res.json({ user });
+}
+```
+
+## Opções de Cookie ⚙️
+
+```typescript
+interface CookieOptions {
+  domain?: string;      // Domínio do cookie
+  path?: string;        // Caminho do cookie
+  expires?: Date;       // Data de expiração
+  maxAge?: number;      // Tempo de vida em segundos
+  httpOnly?: boolean;   // Não acessível via JavaScript
+  secure?: boolean;     // Apenas HTTPS
+  sameSite?: "Strict" | "Lax" | "None";  // Proteção CSRF
+}
+```
+
+### Exemplo com Todas as Opções
+
+```typescript
+const cookie = serializeCookie("token", "abc123", {
+  domain: ".example.com",
+  path: "/",
+  maxAge: 86400,  // 24 horas
+  httpOnly: true,
+  secure: true,
+  sameSite: "Strict"
+});
+
+res.setHeader("Set-Cookie", cookie);
+```
+
+## Múltiplos Cookies 🍪🍪
+
+Defina múltiplos cookies usando array:
+
+```typescript
+@Post("/login")
+login(@Body() credentials: any, @Res() res: ResponseServer) {
+  const user = authenticate(credentials);
+  
+  const cookies = [
+    serializeCookie("sessionId", user.sessionId, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 3600
+    }),
+    serializeCookie("userId", user.id, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 3600
+    }),
+    serializeCookie("theme", user.theme, {
+      maxAge: 31536000  // 1 ano
+    })
+  ];
+  
+  res.setHeader("Set-Cookie", cookies);
+  res.json({ user });
+}
+```
+
+## Deletar Cookies 🗑️
+
+Defina maxAge para 0 ou expires no passado:
+
+```typescript
+@Post("/logout")
+logout(@Res() res: ResponseServer) {
+  const cookie = serializeCookie("sessionId", "", {
+    maxAge: 0,
+    path: "/"
+  });
+  
+  res.setHeader("Set-Cookie", cookie);
+  res.json({ message: "Logout realizado" });
+}
+```
+
+## Cookies Seguros 🔒
+
+### Session Cookies
+
+```typescript
+interface Session {
+  userId: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+@Post("/login")
+login(@Body() credentials: any, @Res() res: ResponseServer) {
+  const user = authenticate(credentials);
+  
+  const session: Session = {
+    userId: user.id,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 3600000  // 1 hora
+  };
+  
+  // Armazenar sessão no servidor
+  sessions.set(user.sessionId, session);
+  
+  // Enviar apenas ID da sessão ao cliente
+  const cookie = serializeCookie("sid", user.sessionId, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "Strict",
+    maxAge: 3600
+  });
+  
+  res.setHeader("Set-Cookie", cookie);
+  res.json({ user: { id: user.id, name: user.name } });
+}
+```
+
+### Cookies Assinados
+
+Para cookies assinados, use uma biblioteca como `cookie-signature`:
+
+```typescript
+import { sign, unsign } from "cookie-signature";
+
+const SECRET = "your-secret-key";
+
+// Assinar cookie
+@Post("/login")
+login(@Body() credentials: any, @Res() res: ResponseServer) {
+  const user = authenticate(credentials);
+  
+  const signedValue = sign(user.id, SECRET);
+  const cookie = serializeCookie("userId", signedValue, {
+    httpOnly: true,
+    secure: true
+  });
+  
+  res.setHeader("Set-Cookie", cookie);
+  res.json({ user });
+}
+
+// Verificar cookie
+@Get("/profile")
+getProfile(@Headers("cookie") cookieHeader: string, @Res() res: ResponseServer) {
+  const cookies = parseCookiesHeader(cookieHeader);
+  const signedUserId = cookies.userId;
+  
+  if (!signedUserId) {
+    return res.status(401).json({ error: "Não autenticado" });
+  }
+  
+  const userId = unsign(signedUserId, SECRET);
+  if (!userId) {
+    return res.status(401).json({ error: "Cookie inválido" });
+  }
+  
+  const user = findUserById(userId);
+  res.json({ user });
+}
+```
+
+## Cookie Helper Class 🛠️
+
+Crie uma classe helper para gerenciar cookies:
+
+```typescript
+class CookieManager {
+  constructor(private req: RequestServer, private res: ResponseServer) {}
+
+  get(name: string): string | undefined {
+    const cookieHeader = this.req.headers.cookie;
+    if (!cookieHeader) return undefined;
+    
+    const cookies = parseCookiesHeader(cookieHeader);
+    return cookies[name];
+  }
+
+  set(name: string, value: string, options?: CookieOptions): void {
+    const cookie = serializeCookie(name, value, options);
+    
+    // Manter cookies existentes
+    const existing = this.res.getHeader("Set-Cookie") || [];
+    const cookies = Array.isArray(existing) ? existing : [existing];
+    cookies.push(cookie);
+    
+    this.res.setHeader("Set-Cookie", cookies);
+  }
+
+  delete(name: string, options?: Omit<CookieOptions, "maxAge" | "expires">): void {
+    this.set(name, "", { ...options, maxAge: 0 });
+  }
+
+  has(name: string): boolean {
+    return this.get(name) !== undefined;
+  }
+}
+
+// Usar no controller
+@Post("/login")
+login(
+  @Body() credentials: any,
+  @Req() req: RequestServer,
+  @Res() res: ResponseServer
+) {
+  const cookies = new CookieManager(req, res);
+  const user = authenticate(credentials);
+  
+  cookies.set("sessionId", user.sessionId, {
+    httpOnly: true,
+    secure: true,
+    maxAge: 3600
+  });
+  
+  res.json({ user });
+}
+```
+
+## Middleware de Cookie 🔌
+
+Adicione cookies automaticamente ao objeto request:
+
+```typescript
+function cookieMiddleware(req: RequestServer, res: ResponseServer, next: () => void) {
+  const cookieHeader = req.headers.cookie;
+  req.cookies = cookieHeader ? parseCookiesHeader(cookieHeader) : {};
+  next();
+}
+
+app.use(cookieMiddleware);
+
+// Agora acesse cookies diretamente
+@Get("/profile")
+getProfile(@Req() req: RequestServer) {
+  const sessionId = req.cookies.sessionId;
+  return { sessionId };
+}
+```
+
+## Validação de Cookies ✅
+
+Valide cookies antes de usá-los:
+
+```typescript
+import { z } from "zod";
+
+const SessionCookieSchema = z.object({
+  sessionId: z.string().uuid(),
+  userId: z.string().uuid()
+});
+
+@Get("/dashboard")
+getDashboard(@Headers("cookie") cookieHeader: string, @Res() res: ResponseServer) {
+  const cookies = parseCookiesHeader(cookieHeader);
+  
+  try {
+    const { sessionId, userId } = SessionCookieSchema.parse(cookies);
+    
+    // Verificar sessão
+    const session = sessions.get(sessionId);
+    if (!session || session.userId !== userId) {
+      return res.status(401).json({ error: "Sessão inválida" });
+    }
+    
+    return res.json({ dashboard: "data" });
+  } catch (error) {
+    return res.status(401).json({ error: "Cookies inválidos" });
+  }
+}
+```
+
+## Exemplos Práticos 🎨
+
+### Sistema de Autenticação Completo
+
+```typescript
+import { randomUUID } from "crypto";
+
+interface UserSession {
+  userId: string;
+  createdAt: number;
+  lastActivity: number;
+}
+
+const sessions = new Map<string, UserSession>();
+
+@Controller("/auth")
+export class AuthController {
+  @Post("/login")
+  login(@Body() credentials: any, @Res() res: ResponseServer) {
+    // Autenticar
+    const user = authenticate(credentials.email, credentials.password);
+    if (!user) {
+      return res.status(401).json({ error: "Credenciais inválidas" });
+    }
+
+    // Criar sessão
+    const sessionId = randomUUID();
+    sessions.set(sessionId, {
+      userId: user.id,
+      createdAt: Date.now(),
+      lastActivity: Date.now()
+    });
+
+    // Definir cookie
+    const cookie = serializeCookie("sessionId", sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict",
+      maxAge: 86400  // 24 horas
+    });
+
+    res.setHeader("Set-Cookie", cookie);
+    res.json({ user: { id: user.id, name: user.name, email: user.email } });
+  }
+
+  @Post("/logout")
+  logout(@Headers("cookie") cookieHeader: string, @Res() res: ResponseServer) {
+    const cookies = parseCookiesHeader(cookieHeader);
+    const sessionId = cookies.sessionId;
+
+    if (sessionId) {
+      sessions.delete(sessionId);
+    }
+
+    const cookie = serializeCookie("sessionId", "", {
+      maxAge: 0,
+      path: "/"
+    });
+
+    res.setHeader("Set-Cookie", cookie);
+    res.json({ message: "Logout realizado" });
+  }
+
+  @Get("/me")
+  getCurrentUser(@Headers("cookie") cookieHeader: string, @Res() res: ResponseServer) {
+    const cookies = parseCookiesHeader(cookieHeader);
+    const sessionId = cookies.sessionId;
+
+    if (!sessionId) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+      return res.status(401).json({ error: "Sessão inválida" });
+    }
+
+    // Atualizar última atividade
+    session.lastActivity = Date.now();
+
+    const user = findUserById(session.userId);
+    res.json({ user });
+  }
+}
+```
+
+### Cookie de Preferências
+
+```typescript
+interface UserPreferences {
+  theme: "light" | "dark";
+  language: "en" | "pt";
+  timezone: string;
+}
+
+@Get("/preferences")
+getPreferences(@Headers("cookie") cookieHeader: string) {
+  const cookies = parseCookiesHeader(cookieHeader);
+  
+  const preferences: UserPreferences = {
+    theme: (cookies.theme as any) || "light",
+    language: (cookies.language as any) || "en",
+    timezone: cookies.timezone || "UTC"
+  };
+  
+  return { preferences };
+}
+
+@Post("/preferences")
+setPreferences(@Body() prefs: UserPreferences, @Res() res: ResponseServer) {
+  const cookies = [
+    serializeCookie("theme", prefs.theme, { maxAge: 31536000 }),
+    serializeCookie("language", prefs.language, { maxAge: 31536000 }),
+    serializeCookie("timezone", prefs.timezone, { maxAge: 31536000 })
+  ];
+  
+  res.setHeader("Set-Cookie", cookies);
+  res.json({ message: "Preferências salvas" });
+}
+```
+
+## Melhores Práticas ✨
+
+<Callout type="tip">
+  **Use httpOnly para cookies de sessão**: Previne acesso via JavaScript (proteção XSS)
+</Callout>
+
+<Callout type="tip">
+  **Use secure em produção**: Garante cookies apenas em HTTPS
+</Callout>
+
+<Callout type="tip">
+  **Use sameSite="Strict"**: Proteção contra CSRF
+</Callout>
+
+<Callout type="warn">
+  **Nunca armazene dados sensíveis em cookies**: Use apenas IDs de sessão
+</Callout>
+
+<Callout type="warn">
+  **Valide cookies do cliente**: Nunca confie cegamente em cookies
+</Callout>
+
+## Próximos Passos 📖
+
+<Cards>
+  <Card title="Middleware" href="middleware" description="Crie middleware de cookies" />
+  <Card title="Error Handling" href="error-handling" description="Trate erros de autenticação" />
+  <Card title="TypeScript" href="typescript-support" description="Type-safe cookies" />
+</Cards>

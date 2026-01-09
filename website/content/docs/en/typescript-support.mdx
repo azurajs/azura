@@ -1,0 +1,427 @@
+---
+title: TypeScript Support
+description: Leverage full TypeScript support in AzuraJS
+icon: Box
+---
+
+# TypeScript Support 🔷
+
+AzuraJS is built with TypeScript and provides first-class type safety throughout your application.
+
+## Full Type Safety 🛡️
+
+All AzuraJS APIs are fully typed:
+
+```typescript
+import type {
+  RequestServer,
+  ResponseServer,
+  RequestHandler,
+  ConfigTypes,
+  CookieOptions,
+} from "azurajs";
+```
+
+## Request and Response Types 📦
+
+### RequestServer
+
+```typescript
+interface RequestServer extends IncomingMessage {
+  body?: any;
+  params?: Record<string, string>;
+  query?: Record<string, string>;
+  cookies?: Record<string, string>;
+  originalUrl: string;
+  protocol: "http" | "https";
+  secure: boolean;
+  hostname: string;
+  subdomains: string[];
+  ips: string[];
+  get(name: string): string | undefined;
+  header(name: string): string | undefined;
+}
+```
+
+### ResponseServer
+
+```typescript
+interface ResponseServer extends ServerResponse {
+  status(code: number): ResponseServer;
+  send(body: any): void;
+  json(data: any): void;
+  set(field: string, value: string | number | string[]): ResponseServer;
+  header(field: string, value: string | number | string[]): ResponseServer;
+  get(field: string): string | undefined;
+  type(contentType: string): ResponseServer;
+  contentType(contentType: string): ResponseServer;
+}
+```
+
+## Typed DTOs 📋
+
+Create strongly-typed Data Transfer Objects:
+
+```typescript
+// User types
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: "user" | "admin";
+  createdAt: Date;
+}
+
+interface CreateUserDto {
+  name: string;
+  email: string;
+  password: string;
+  role?: "user" | "admin";
+}
+
+interface UpdateUserDto {
+  name?: string;
+  email?: string;
+  role?: "user" | "admin";
+}
+
+// Use in controller
+@Controller("/api/users")
+export class UserController {
+  @Post()
+  createUser(@Body() data: CreateUserDto, @Res() res: ResponseServer): void {
+    // data is fully typed
+    const user: User = {
+      id: Date.now(),
+      name: data.name,
+      email: data.email,
+      role: data.role || "user",
+      createdAt: new Date(),
+    };
+    
+    res.status(201).json({ user });
+  }
+
+  @Patch("/:id")
+  updateUser(
+    @Param("id") id: string,
+    @Body() data: UpdateUserDto,
+    @Res() res: ResponseServer
+  ): void {
+    // TypeScript knows all fields are optional
+    res.json({ id, ...data });
+  }
+}
+```
+
+## Generic Response Types 🎯
+
+Create type-safe response wrappers:
+
+```typescript
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+// Usage
+@Get()
+getUsers(@Res() res: ResponseServer): void {
+  const response: ApiResponse<User[]> = {
+    success: true,
+    data: users,
+  };
+  res.json(response);
+}
+
+@Get("/paginated")
+getPaginatedUsers(
+  @Query("page") page: string,
+  @Query("limit") limit: string,
+  @Res() res: ResponseServer
+): void {
+  const response: PaginatedResponse<User> = {
+    data: users.slice(0, 10),
+    pagination: {
+      page: Number(page),
+      limit: Number(limit),
+      total: users.length,
+      totalPages: Math.ceil(users.length / Number(limit)),
+    },
+  };
+  res.json(response);
+}
+```
+
+## Type Guards 🛡️
+
+Use type guards for runtime type checking:
+
+```typescript
+function isUser(obj: any): obj is User {
+  return (
+    typeof obj === "object" &&
+    typeof obj.id === "number" &&
+    typeof obj.name === "string" &&
+    typeof obj.email === "string" &&
+    ["user", "admin"].includes(obj.role)
+  );
+}
+
+@Post()
+createUser(@Body() body: any, @Res() res: ResponseServer): void {
+  if (!isUser(body)) {
+    res.status(400).json({ error: "Invalid user data" });
+    return;
+  }
+  
+  // body is now typed as User
+  res.json({ user: body });
+}
+```
+
+## Zod for Runtime Validation 📦
+
+Combine TypeScript types with runtime validation:
+
+```typescript
+import { z } from "zod";
+
+// Define schema
+const createUserSchema = z.object({
+  name: z.string().min(2).max(50),
+  email: z.string().email(),
+  password: z.string().min(8),
+  role: z.enum(["user", "admin"]).optional(),
+});
+
+// Infer TypeScript type from schema
+type CreateUserDto = z.infer<typeof createUserSchema>;
+
+@Post()
+createUser(@Body() body: unknown, @Res() res: ResponseServer): void {
+  try {
+    // Validate and get typed data
+    const data: CreateUserDto = createUserSchema.parse(body);
+    
+    // data is fully typed and validated
+    res.status(201).json({ user: data });
+  } catch (error) {
+    res.status(400).json({ error: "Validation failed" });
+  }
+}
+```
+
+## Middleware Types 🔌
+
+Create typed middleware:
+
+```typescript
+import type { RequestHandler } from "azurajs";
+
+interface AuthenticatedRequest extends RequestServer {
+  user: User;
+}
+
+const authMiddleware: RequestHandler = async (req, res, next) => {
+  const token = req.headers.authorization;
+  
+  if (!token) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  
+  const user = await verifyToken(token);
+  (req as AuthenticatedRequest).user = user;
+  
+  await next();
+};
+
+// Use in controller
+@Get("/profile")
+getProfile(@Req() req: AuthenticatedRequest, @Res() res: ResponseServer): void {
+  // req.user is typed as User
+  res.json({ user: req.user });
+}
+```
+
+## Configuration Types ⚙️
+
+Configuration is fully typed:
+
+```typescript
+import type { ConfigTypes } from "azurajs";
+
+const config: ConfigTypes = {
+  environment: "development",  // "development" | "production" | "test"
+  server: {
+    port: 3000,
+    cluster: false,
+    ipHost: true,
+    https: false,
+  },
+  logging: {
+    enabled: true,
+    showDetails: true,
+  },
+  plugins: {
+    cors: {
+      enabled: true,
+      origins: ["*"],
+      methods: ["GET", "POST"],
+      allowedHeaders: ["Content-Type"],
+    },
+    rateLimit: {
+      enabled: false,
+      limit: 100,
+      timeframe: 60000,
+    },
+  },
+};
+```
+
+## Enum Types 🎯
+
+Use enums for fixed values:
+
+```typescript
+enum UserRole {
+  USER = "user",
+  ADMIN = "admin",
+  MODERATOR = "moderator",
+}
+
+enum OrderStatus {
+  PENDING = "pending",
+  PROCESSING = "processing",
+  COMPLETED = "completed",
+  CANCELLED = "cancelled",
+}
+
+interface User {
+  id: number;
+  name: string;
+  role: UserRole;
+}
+
+@Post("/users")
+createUser(@Body() data: any, @Res() res: ResponseServer): void {
+  const user: User = {
+    id: Date.now(),
+    name: data.name,
+    role: UserRole.USER,  // Type-safe
+  };
+  res.json({ user });
+}
+```
+
+## Utility Types 🛠️
+
+Leverage TypeScript utility types:
+
+```typescript
+// Partial - make all properties optional
+type UpdateUserDto = Partial<CreateUserDto>;
+
+// Pick - select specific properties
+type UserPublicInfo = Pick<User, "id" | "name" | "role">;
+
+// Omit - exclude specific properties
+type UserWithoutPassword = Omit<User, "password">;
+
+// Required - make all properties required
+type RequiredConfig = Required<ConfigTypes>;
+
+// Readonly - make all properties readonly
+type ImmutableUser = Readonly<User>;
+
+// Usage
+@Get("/:id")
+getUser(@Param("id") id: string, @Res() res: ResponseServer): void {
+  const user: User = findUser(id);
+  const publicInfo: UserPublicInfo = {
+    id: user.id,
+    name: user.name,
+    role: user.role,
+  };
+  res.json({ user: publicInfo });
+}
+```
+
+## Strict Mode 🔒
+
+Enable strict TypeScript checking:
+
+```json title="tsconfig.json"
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
+  }
+}
+```
+
+## Type Inference ✨
+
+Let TypeScript infer types automatically:
+
+```typescript
+// No need to explicitly type these
+const users = [
+  { id: 1, name: "Alice" },
+  { id: 2, name: "Bob" },
+]; // Type: { id: number; name: string }[]
+
+function getUser(id: number) {
+  return users.find(u => u.id === id);
+} // Return type: { id: number; name: string } | undefined
+
+const user = getUser(1);  // Type inferred as above
+```
+
+## Best Practices ✨
+
+<Callout type="tip">
+  **Use interfaces for DTOs** - Clear contracts for data shapes
+</Callout>
+
+<Callout type="tip">
+  **Leverage type inference** - Let TypeScript figure out types when obvious
+</Callout>
+
+<Callout type="tip">
+  **Enable strict mode** - Catch more errors at compile time
+</Callout>
+
+<Callout type="warn">
+  **Avoid `any`** - Use `unknown` or proper types instead
+</Callout>
+
+## Next Steps 📖
+
+<Cards>
+  <Card title="Validation" href="validation" description="Runtime validation with Zod" />
+  <Card title="Examples" href="examples" description="See typed examples" />
+  <Card title="Performance" href="performance" description="TypeScript performance tips" />
+</Cards>

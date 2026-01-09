@@ -1,0 +1,340 @@
+---
+title: Error Handling
+description: Handle errors gracefully in AzuraJS
+icon: TriangleAlert
+---
+
+# Error Handling 🚨
+
+Proper error handling ensures your API returns meaningful responses and stays resilient.
+
+## HttpError Class 💥
+
+Use the built-in `HttpError` class for HTTP errors:
+
+```typescript
+import { HttpError } from "azurajs";
+
+@Get("/:id")
+getUser(@Param("id") id: string, @Res() res: ResponseServer) {
+  const user = users.find(u => u.id === id);
+  
+  if (!user) {
+    throw new HttpError(404, "User not found");
+  }
+  
+  res.json({ user });
+}
+```
+
+## Try-Catch Blocks 🛡️
+
+Wrap async operations in try-catch:
+
+```typescript
+@Post()
+async createUser(@Body() data: any, @Res() res: ResponseServer) {
+  try {
+    const user = await database.users.create(data);
+    res.status(201).json({ user });
+  } catch (error) {
+    if (error instanceof HttpError) {
+      res.status(error.status).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+}
+```
+
+## Error Response Format 📋
+
+Use a consistent error response structure:
+
+```typescript
+interface ErrorResponse {
+  error: string;
+  message?: string;
+  details?: any;
+  timestamp: string;
+  path: string;
+}
+
+function sendError(
+  res: ResponseServer,
+  status: number,
+  message: string,
+  details?: any
+) {
+  res.status(status).json({
+    error: message,
+    details,
+    timestamp: new Date().toISOString(),
+    path: res.req?.url,
+  });
+}
+
+// Usage
+@Get("/:id")
+getUser(@Param("id") id: string, @Res() res: ResponseServer) {
+  const user = users.find(u => u.id === id);
+  
+  if (!user) {
+    return sendError(res, 404, "User not found");
+  }
+  
+  res.json({ user });
+}
+```
+
+## Global Error Handler 🌐
+
+Create a global error handling middleware:
+
+```typescript
+import { HttpError } from "azurajs";
+import type { RequestHandler } from "azurajs";
+
+export const errorHandler: RequestHandler = async (req, res, next) => {
+  try {
+    await next();
+  } catch (error: any) {
+    console.error(`[Error] ${req.method} ${req.url}:`, error);
+    
+    if (error instanceof HttpError) {
+      res.status(error.status).json({
+        error: error.message,
+        status: error.status,
+        timestamp: new Date().toISOString(),
+        path: req.url,
+      });
+    } else if (error.name === "ValidationError") {
+      res.status(400).json({
+        error: "Validation failed",
+        details: error.details,
+      });
+    } else {
+      res.status(500).json({
+        error: process.env.NODE_ENV === "production" 
+          ? "Internal server error" 
+          : error.message,
+        ...(process.env.NODE_ENV !== "production" && { stack: error.stack }),
+      });
+    }
+  }
+};
+
+// Apply globally
+const app = new AzuraClient();
+app.use(errorHandler);
+```
+
+## Validation Errors ✅
+
+Handle validation errors consistently:
+
+```typescript
+import { z, ZodError } from "zod";
+
+@Post()
+createUser(@Body() body: any, @Res() res: ResponseServer) {
+  try {
+    const data = userSchema.parse(body);
+    // Create user...
+    res.status(201).json({ user: data });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      res.status(400).json({
+        error: "Validation failed",
+        details: error.errors.map(e => ({
+          field: e.path.join("."),
+          message: e.message,
+        })),
+      });
+    }
+  }
+}
+```
+
+## Custom Error Classes 🎯
+
+Create custom error types:
+
+```typescript
+export class NotFoundError extends HttpError {
+  constructor(resource: string, id: string) {
+    super(404, `${resource} with id ${id} not found`);
+    this.name = "NotFoundError";
+  }
+}
+
+export class UnauthorizedError extends HttpError {
+  constructor(message = "Unauthorized") {
+    super(401, message);
+    this.name = "UnauthorizedError";
+  }
+}
+
+export class ForbiddenError extends HttpError {
+  constructor(message = "Forbidden") {
+    super(403, message);
+    this.name = "ForbiddenError";
+  }
+}
+
+export class ValidationError extends HttpError {
+  constructor(public details: any) {
+    super(400, "Validation failed");
+    this.name = "ValidationError";
+  }
+}
+
+// Usage
+@Get("/:id")
+getUser(@Param("id") id: string) {
+  const user = users.find(u => u.id === id);
+  if (!user) {
+    throw new NotFoundError("User", id);
+  }
+  return { user };
+}
+
+@Get("/admin")
+getAdminData(@Req() req: RequestServer) {
+  if (!req.user?.isAdmin) {
+    throw new ForbiddenError("Admin access required");
+  }
+  return { data: "admin data" };
+}
+```
+
+## Async Error Handling 🔄
+
+Handle async errors properly:
+
+```typescript
+@Get("/data")
+async getData(@Res() res: ResponseServer) {
+  try {
+    const data = await fetchFromDatabase();
+    const processed = await processData(data);
+    res.json({ data: processed });
+  } catch (error: any) {
+    console.error("Failed to get data:", error);
+    res.status(500).json({ 
+      error: "Failed to retrieve data",
+      message: error.message 
+    });
+  }
+}
+```
+
+## Database Errors 🗄️
+
+Handle common database errors:
+
+```typescript
+@Post()
+async createUser(@Body() data: any, @Res() res: ResponseServer) {
+  try {
+    const user = await database.users.create(data);
+    res.status(201).json({ user });
+  } catch (error: any) {
+    if (error.code === "23505") {  // PostgreSQL unique violation
+      res.status(409).json({ error: "User already exists" });
+    } else if (error.code === "23503") {  // Foreign key violation
+      res.status(400).json({ error: "Invalid reference" });
+    } else {
+      console.error("Database error:", error);
+      res.status(500).json({ error: "Database error" });
+    }
+  }
+}
+```
+
+## Error Logging 📝
+
+Log errors for monitoring:
+
+```typescript
+import { logger } from "azurajs";
+
+export const errorLogger: RequestHandler = async (req, res, next) => {
+  try {
+    await next();
+  } catch (error: any) {
+    // Log error
+    logger("error", `${req.method} ${req.url} - ${error.message}`);
+    
+    if (error.stack) {
+      logger("error", error.stack);
+    }
+    
+    // Send error log to external service
+    if (process.env.NODE_ENV === "production") {
+      await sendToErrorTracker(error, {
+        method: req.method,
+        url: req.url,
+        user: (req as any).user?.id,
+      });
+    }
+    
+    throw error;  // Re-throw for error handler
+  }
+};
+```
+
+## 404 Handler 🔍
+
+Handle routes that don't exist:
+
+```typescript
+// Register after all routes
+app.use(async (req, res) => {
+  res.status(404).json({
+    error: "Not Found",
+    message: `Cannot ${req.method} ${req.url}`,
+    timestamp: new Date().toISOString(),
+  });
+});
+```
+
+## Best Practices ✨
+
+<Callout type="tip">
+  **Always catch async errors** - Use try-catch for all async operations
+</Callout>
+
+<Callout type="tip">
+  **Return meaningful messages** - Help clients understand what went wrong
+</Callout>
+
+<Callout type="warn">
+  **Hide internal details in production** - Don't expose stack traces or DB errors
+</Callout>
+
+<Callout type="info">
+  **Log all errors** - Monitor and track errors for debugging
+</Callout>
+
+## Common HTTP Status Codes 📊
+
+| Code | Meaning | When to Use |
+|------|---------|-------------|
+| 400 | Bad Request | Invalid input, validation errors |
+| 401 | Unauthorized | No authentication credentials |
+| 403 | Forbidden | Valid credentials but no permission |
+| 404 | Not Found | Resource doesn't exist |
+| 409 | Conflict | Resource already exists |
+| 422 | Unprocessable Entity | Valid format but can't process |
+| 429 | Too Many Requests | Rate limit exceeded |
+| 500 | Internal Server Error | Unexpected server error |
+| 503 | Service Unavailable | Server temporarily down |
+
+## Next Steps 📖
+
+<Cards>
+  <Card title="Validation" href="validation" description="Prevent errors with validation" />
+  <Card title="Middleware" href="middleware" description="Create error handling middleware" />
+  <Card title="Examples" href="examples" description="See error handling examples" />
+</Cards>

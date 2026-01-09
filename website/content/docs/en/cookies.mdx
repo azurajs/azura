@@ -1,0 +1,328 @@
+---
+title: Cookies
+description: Work with cookies in AzuraJS
+icon: Cookie
+---
+
+# Cookies 🍪
+
+AzuraJS provides built-in utilities for parsing and serializing cookies.
+
+## Parsing Cookies 📖
+
+Extract cookies from request headers:
+
+```typescript
+import { parseCookiesHeader } from "azurajs";
+
+@Get("/profile")
+getProfile(@Req() req: RequestServer, @Res() res: ResponseServer) {
+  const cookies = parseCookiesHeader(req.headers.cookie || "");
+  const sessionId = cookies.sessionId;
+  
+  res.json({ sessionId });
+}
+```
+
+## Setting Cookies 🔧
+
+Set cookies in the response:
+
+```typescript
+import { serializeCookie } from "azurajs";
+
+@Post("/login")
+login(@Body() credentials: any, @Res() res: ResponseServer) {
+  // Authenticate user...
+  const sessionId = generateSessionId();
+  
+  const cookie = serializeCookie("sessionId", sessionId, {
+    httpOnly: true,
+    secure: true,
+    maxAge: 3600, // 1 hour
+    path: "/",
+  });
+  
+  res.setHeader("Set-Cookie", cookie);
+  res.json({ success: true });
+}
+```
+
+## Cookie Options ⚙️
+
+### httpOnly
+
+Prevents JavaScript from accessing the cookie (security):
+
+```typescript
+serializeCookie("token", "value", {
+  httpOnly: true  // Recommended for session cookies
+});
+```
+
+### secure
+
+Only send cookie over HTTPS:
+
+```typescript
+serializeCookie("token", "value", {
+  secure: true  // Required for production
+});
+```
+
+### maxAge
+
+Cookie lifetime in seconds:
+
+```typescript
+serializeCookie("sessionId", "value", {
+  maxAge: 3600  // 1 hour
+});
+
+serializeCookie("rememberMe", "value", {
+  maxAge: 30 * 24 * 60 * 60  // 30 days
+});
+```
+
+### path
+
+Cookie path scope:
+
+```typescript
+serializeCookie("token", "value", {
+  path: "/"  // Available on all paths
+});
+
+serializeCookie("admin", "value", {
+  path: "/admin"  // Only on /admin routes
+});
+```
+
+### domain
+
+Cookie domain scope:
+
+```typescript
+serializeCookie("token", "value", {
+  domain: ".example.com"  // Available on all subdomains
+});
+```
+
+### sameSite
+
+CSRF protection:
+
+```typescript
+serializeCookie("token", "value", {
+  sameSite: "Strict"  // Strict, Lax, or None
+});
+```
+
+## Complete Cookie Example 🎯
+
+```typescript
+import { parseCookiesHeader, serializeCookie } from "azurajs";
+import type { CookieOptions } from "azurajs";
+
+@Controller("/api/auth")
+export class AuthController {
+  // Login and set session cookie
+  @Post("/login")
+  login(@Body() credentials: any, @Res() res: ResponseServer) {
+    // Validate credentials
+    if (!isValidCredentials(credentials)) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+    
+    // Create session
+    const sessionId = createSession(credentials.username);
+    
+    const options: CookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 24 * 60 * 60, // 24 hours
+      path: "/",
+      sameSite: "Strict",
+    };
+    
+    const cookie = serializeCookie("sessionId", sessionId, options);
+    res.setHeader("Set-Cookie", cookie);
+    
+    res.json({ success: true });
+  }
+
+  // Get user from session cookie
+  @Get("/me")
+  getCurrentUser(@Req() req: RequestServer, @Res() res: ResponseServer) {
+    const cookies = parseCookiesHeader(req.headers.cookie || "");
+    const sessionId = cookies.sessionId;
+    
+    if (!sessionId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    
+    const user = getUserFromSession(sessionId);
+    if (!user) {
+      return res.status(401).json({ error: "Invalid session" });
+    }
+    
+    res.json({ user });
+  }
+
+  // Logout and clear cookie
+  @Post("/logout")
+  logout(@Res() res: ResponseServer) {
+    // Clear cookie by setting maxAge to 0
+    const cookie = serializeCookie("sessionId", "", {
+      httpOnly: true,
+      maxAge: 0,
+      path: "/",
+    });
+    
+    res.setHeader("Set-Cookie", cookie);
+    res.json({ success: true });
+  }
+}
+```
+
+## Cookie Middleware 🔌
+
+Create middleware for cookie authentication:
+
+```typescript
+import { parseCookiesHeader } from "azurajs";
+import type { RequestHandler } from "azurajs";
+
+export const cookieAuthMiddleware: RequestHandler = async (req, res, next) => {
+  const cookies = parseCookiesHeader(req.headers.cookie || "");
+  const sessionId = cookies.sessionId;
+  
+  if (!sessionId) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  
+  const user = await getUserFromSession(sessionId);
+  if (!user) {
+    res.status(401).json({ error: "Invalid session" });
+    return;
+  }
+  
+  // Attach user to request
+  (req as any).user = user;
+  await next();
+};
+
+// Usage
+app.use(cookieAuthMiddleware);
+```
+
+## Multiple Cookies 🍪🍪
+
+Set multiple cookies at once:
+
+```typescript
+@Post("/login")
+login(@Body() credentials: any, @Res() res: ResponseServer) {
+  const sessionId = createSession(credentials.username);
+  const csrfToken = generateCSRFToken();
+  
+  const cookies = [
+    serializeCookie("sessionId", sessionId, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 3600,
+    }),
+    serializeCookie("csrfToken", csrfToken, {
+      httpOnly: false,  // Accessible to JavaScript
+      secure: true,
+      maxAge: 3600,
+    }),
+  ];
+  
+  res.setHeader("Set-Cookie", cookies);
+  res.json({ success: true });
+}
+```
+
+## Signed Cookies 🔐
+
+Sign cookies for tamper protection:
+
+```typescript
+import { createHmac } from "crypto";
+
+function signCookie(value: string, secret: string): string {
+  const signature = createHmac("sha256", secret)
+    .update(value)
+    .digest("base64");
+  return `${value}.${signature}`;
+}
+
+function verifyCookie(signedValue: string, secret: string): string | null {
+  const [value, signature] = signedValue.split(".");
+  const expectedSignature = createHmac("sha256", secret)
+    .update(value)
+    .digest("base64");
+  
+  if (signature === expectedSignature) {
+    return value;
+  }
+  return null;
+}
+
+// Usage
+@Post("/login")
+login(@Body() credentials: any, @Res() res: ResponseServer) {
+  const sessionId = createSession(credentials.username);
+  const signedSessionId = signCookie(sessionId, process.env.COOKIE_SECRET!);
+  
+  const cookie = serializeCookie("sessionId", signedSessionId, {
+    httpOnly: true,
+    secure: true,
+  });
+  
+  res.setHeader("Set-Cookie", cookie);
+  res.json({ success: true });
+}
+
+@Get("/me")
+getCurrentUser(@Req() req: RequestServer, @Res() res: ResponseServer) {
+  const cookies = parseCookiesHeader(req.headers.cookie || "");
+  const signedSessionId = cookies.sessionId;
+  
+  const sessionId = verifyCookie(signedSessionId, process.env.COOKIE_SECRET!);
+  if (!sessionId) {
+    return res.status(401).json({ error: "Invalid session" });
+  }
+  
+  const user = getUserFromSession(sessionId);
+  res.json({ user });
+}
+```
+
+## Best Practices ✨
+
+<Callout type="tip">
+  **Always use httpOnly** for sensitive cookies (sessions, tokens)
+</Callout>
+
+<Callout type="tip">
+  **Use secure in production** to ensure cookies are only sent over HTTPS
+</Callout>
+
+<Callout type="warn">
+  **Set appropriate expiration** - Don't keep sessions forever
+</Callout>
+
+<Callout type="warn">
+  **Use sameSite** for CSRF protection
+</Callout>
+
+## Next Steps 📖
+
+<Cards>
+  <Card title="Middleware" href="middleware" description="Create authentication middleware" />
+  <Card title="Error Handling" href="error-handling" description="Handle auth errors" />
+  <Card title="Examples" href="examples" description="See cookie usage examples" />
+</Cards>

@@ -1,0 +1,314 @@
+---
+title: Middleware
+description: Create and use middleware in AzuraJS
+icon: Plug
+---
+
+# Middleware 🔌
+
+Middleware functions intercept requests and responses, allowing you to add authentication, logging, validation, and more.
+
+## What is Middleware? 📚
+
+Middleware is a function that executes before your route handler. It has access to the request and response objects and can:
+
+- Execute code
+- Modify request/response objects
+- End the request-response cycle
+- Call the next middleware
+
+## Creating Middleware 🛠️
+
+### Basic Middleware
+
+```typescript
+import type { RequestHandler } from "azurajs";
+
+const myMiddleware: RequestHandler = async (req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  await next();
+};
+```
+
+### Middleware with Configuration
+
+```typescript
+function createAuthMiddleware(secret: string): RequestHandler {
+  return async (req, res, next) => {
+    const token = req.headers.authorization;
+    
+    if (!token) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    
+    // Verify token logic here
+    await next();
+  };
+}
+```
+
+## Using Middleware 🔧
+
+### Global Middleware
+
+Apply middleware to all routes:
+
+```typescript
+import { AzuraClient } from "azurajs";
+
+const app = new AzuraClient();
+
+// Add global middleware
+app.use(async (req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  await next();
+});
+
+app.use(async (req, res, next) => {
+  res.setHeader("X-Powered-By", "AzuraJS");
+  await next();
+});
+```
+
+### Built-in Logging Middleware
+
+AzuraJS includes a logging middleware:
+
+```typescript
+import { AzuraClient, createLoggingMiddleware } from "azurajs";
+
+const app = new AzuraClient();
+const logger = createLoggingMiddleware(app.getConfig());
+app.use(logger);
+```
+
+## Middleware Examples 🎨
+
+### Authentication Middleware
+
+```typescript
+import { HttpError } from "azurajs";
+import type { RequestHandler } from "azurajs";
+
+export const authMiddleware: RequestHandler = async (req, res, next) => {
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  
+  if (!token) {
+    res.status(401).json({ error: "No token provided" });
+    return;
+  }
+  
+  try {
+    // Verify token (example with JWT)
+    const user = await verifyToken(token);
+    (req as any).user = user;  // Attach user to request
+    await next();
+  } catch (error) {
+    res.status(401).json({ error: "Invalid token" });
+  }
+};
+```
+
+### CORS Middleware
+
+```typescript
+export const corsMiddleware: RequestHandler = async (req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+  
+  await next();
+};
+```
+
+### Rate Limiting Middleware
+
+```typescript
+const requests = new Map<string, number[]>();
+
+export function rateLimitMiddleware(limit: number, windowMs: number): RequestHandler {
+  return async (req, res, next) => {
+    const ip = req.socket.remoteAddress || "unknown";
+    const now = Date.now();
+    
+    const userRequests = requests.get(ip) || [];
+    const recentRequests = userRequests.filter(time => now - time < windowMs);
+    
+    if (recentRequests.length >= limit) {
+      res.status(429).json({ error: "Too many requests" });
+      return;
+    }
+    
+    recentRequests.push(now);
+    requests.set(ip, recentRequests);
+    
+    await next();
+  };
+}
+
+// Usage
+app.use(rateLimitMiddleware(100, 60000)); // 100 requests per minute
+```
+
+### Request ID Middleware
+
+```typescript
+import { randomUUID } from "crypto";
+
+export const requestIdMiddleware: RequestHandler = async (req, res, next) => {
+  const requestId = randomUUID();
+  (req as any).id = requestId;
+  res.setHeader("X-Request-ID", requestId);
+  await next();
+};
+```
+
+### Error Handling Middleware
+
+```typescript
+export const errorMiddleware: RequestHandler = async (req, res, next) => {
+  try {
+    await next();
+  } catch (error: any) {
+    console.error("Error:", error);
+    
+    if (error instanceof HttpError) {
+      res.status(error.status).json({
+        error: error.message
+      });
+    } else {
+      res.status(500).json({
+        error: "Internal server error"
+      });
+    }
+  }
+};
+```
+
+### Body Parser Middleware
+
+```typescript
+export const jsonParserMiddleware: RequestHandler = async (req, res, next) => {
+  if (req.headers["content-type"]?.includes("application/json")) {
+    let body = "";
+    
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
+    
+    req.on("end", () => {
+      try {
+        req.body = JSON.parse(body);
+      } catch (error) {
+        req.body = {};
+      }
+      next();
+    });
+  } else {
+    await next();
+  }
+};
+```
+
+## Middleware Chains 🔗
+
+Stack multiple middleware functions:
+
+```typescript
+const app = new AzuraClient();
+
+// Order matters!
+app.use(requestIdMiddleware);
+app.use(corsMiddleware);
+app.use(createLoggingMiddleware(app.getConfig()));
+app.use(authMiddleware);  // This runs last
+```
+
+## Conditional Middleware ⚡
+
+Apply middleware conditionally:
+
+```typescript
+const conditionalAuth: RequestHandler = async (req, res, next) => {
+  // Skip auth for public routes
+  if (req.url?.startsWith("/api/public")) {
+    await next();
+    return;
+  }
+  
+  // Apply auth for other routes
+  await authMiddleware(req, res, next);
+};
+
+app.use(conditionalAuth);
+```
+
+## Middleware Best Practices ✨
+
+<Callout type="tip">
+  **Always call next()**: Unless you're ending the response, always call `next()`
+</Callout>
+
+<Callout type="tip">
+  **Order matters**: Middleware executes in the order it's added
+</Callout>
+
+<Callout type="warn">
+  **Don't forget async/await**: Always use async functions with `await next()`
+</Callout>
+
+<Callout type="warn">
+  **Error handling**: Wrap risky code in try-catch blocks
+</Callout>
+
+## Middleware Timing ⏱️
+
+Measure middleware execution time:
+
+```typescript
+const timingMiddleware: RequestHandler = async (req, res, next) => {
+  const start = Date.now();
+  
+  await next();
+  
+  const duration = Date.now() - start;
+  res.setHeader("X-Response-Time", `${duration}ms`);
+  console.log(`${req.method} ${req.url} - ${duration}ms`);
+};
+```
+
+## Testing Middleware 🧪
+
+```typescript
+import { describe, it, expect } from "bun:test";
+
+describe("Auth Middleware", () => {
+  it("should reject requests without token", async () => {
+    const req = { headers: {} } as any;
+    const res = {
+      status: (code: number) => ({
+        json: (data: any) => ({ code, data })
+      })
+    } as any;
+    const next = async () => {};
+    
+    await authMiddleware(req, res, next);
+    
+    // Assertions
+  });
+});
+```
+
+## Next Steps 📖
+
+<Cards>
+  <Card title="CORS" href="cors" description="Configure CORS properly" />
+  <Card title="Rate Limiting" href="rate-limiting" description="Protect your API" />
+  <Card title="Error Handling" href="error-handling" description="Handle errors gracefully" />
+</Cards>

@@ -1,0 +1,443 @@
+---
+title: Controllers
+description: Aprenda sobre o padrão controller no AzuraJS
+icon: Target
+---
+
+# Controllers 🎯
+
+Controllers são o coração das aplicações AzuraJS. Eles organizam seus manipuladores de rota em classes lógicas e reutilizáveis usando decorators TypeScript.
+
+## O que é um Controller? 📚
+
+Um controller é uma classe decorada com `@Controller` que agrupa manipuladores de rota relacionados. Cada método no controller manipula uma rota específica.
+
+```typescript
+import { Controller, Get, Post } from "azurajs";
+
+@Controller("/api/products")
+export class ProductController {
+  
+  @Get()
+  getAllProducts() {
+    return { products: [] };
+  }
+
+  @Post()
+  createProduct() {
+    return { message: "Produto criado" };
+  }
+}
+```
+
+## Decorator Controller 🏷️
+
+O decorator `@Controller` define um caminho base para todas as rotas no controller.
+
+### Uso Básico
+
+```typescript
+@Controller("/api/users")
+export class UserController {
+  // Rotas serão prefixadas com /api/users
+}
+```
+
+### Sem Prefixo
+
+```typescript
+@Controller()  // Sem prefixo
+export class RootController {
+  @Get("/health")  // Rota: /health
+  healthCheck() {
+    return { status: "ok" };
+  }
+}
+```
+
+### Caminhos Aninhados
+
+```typescript
+@Controller("/api/v1/admin")
+export class AdminController {
+  @Get("/users")  // Rota: /api/v1/admin/users
+  getUsers() {
+    return { users: [] };
+  }
+}
+```
+
+## Criando Controllers 🛠️
+
+### Passo 1: Criar a Classe Controller
+
+```typescript title="src/controllers/UserController.ts"
+import { 
+  Controller, 
+  Get, 
+  Post, 
+  Put, 
+  Delete,
+  Body, 
+  Param, 
+  Res 
+} from "azurajs";
+import type { ResponseServer } from "azurajs";
+
+@Controller("/api/users")
+export class UserController {
+  
+  @Get()
+  getAllUsers(@Res() res: ResponseServer) {
+    res.json({ users: [] });
+  }
+
+  @Get("/:id")
+  getUser(@Param("id") id: string, @Res() res: ResponseServer) {
+    res.json({ id, name: `User ${id}` });
+  }
+
+  @Post()
+  createUser(@Body() data: any, @Res() res: ResponseServer) {
+    res.status(201).json({ id: Date.now(), ...data });
+  }
+
+  @Put("/:id")
+  updateUser(
+    @Param("id") id: string,
+    @Body() data: any,
+    @Res() res: ResponseServer
+  ) {
+    res.json({ id, ...data });
+  }
+
+  @Delete("/:id")
+  deleteUser(@Param("id") id: string, @Res() res: ResponseServer) {
+    res.json({ message: "Usuário deletado" });
+  }
+}
+```
+
+### Passo 2: Registrar o Controller
+
+```typescript title="src/index.ts"
+import { AzuraClient, applyDecorators } from "azurajs";
+import { UserController } from "./controllers/UserController";
+
+const app = new AzuraClient();
+
+// Registrar um único controller
+applyDecorators(app, [UserController]);
+
+await app.listen();
+```
+
+## Múltiplos Controllers 📦
+
+Registre múltiplos controllers de uma vez:
+
+```typescript title="src/index.ts"
+import { AzuraClient, applyDecorators } from "azurajs";
+import { UserController } from "./controllers/UserController";
+import { ProductController } from "./controllers/ProductController";
+import { AuthController } from "./controllers/AuthController";
+
+const app = new AzuraClient();
+
+applyDecorators(app, [
+  UserController,
+  ProductController,
+  AuthController,
+]);
+
+await app.listen();
+```
+
+## Organização de Controllers 📁
+
+Organize controllers por funcionalidade ou recurso:
+
+```
+src/
+├── controllers/
+│   ├── index.ts
+│   ├── UserController.ts
+│   ├── ProductController.ts
+│   ├── OrderController.ts
+│   └── AuthController.ts
+├── services/
+│   ├── UserService.ts
+│   └── ProductService.ts
+└── index.ts
+```
+
+Crie uma exportação barrel:
+
+```typescript title="src/controllers/index.ts"
+export { UserController } from "./UserController";
+export { ProductController } from "./ProductController";
+export { OrderController } from "./OrderController";
+export { AuthController } from "./AuthController";
+```
+
+Depois importe todos de uma vez:
+
+```typescript title="src/index.ts"
+import { AzuraClient, applyDecorators } from "azurajs";
+import * as controllers from "./controllers";
+
+const app = new AzuraClient();
+applyDecorators(app, Object.values(controllers));
+await app.listen();
+```
+
+## Melhores Práticas de Controllers ✨
+
+### 1. Responsabilidade Única
+
+Cada controller deve lidar com um recurso ou funcionalidade:
+
+```typescript
+// ✅ Bom: Focado em usuários
+@Controller("/api/users")
+export class UserController {
+  @Get() getAll() {}
+  @Post() create() {}
+}
+
+// ❌ Ruim: Responsabilidades misturadas
+@Controller("/api")
+export class ApiController {
+  @Get("/users") getUsers() {}
+  @Get("/products") getProducts() {}
+  @Get("/orders") getOrders() {}
+}
+```
+
+### 2. Use Services para Lógica de Negócio
+
+Mantenha controllers enxutos delegando para services:
+
+```typescript
+// UserService.ts
+export class UserService {
+  async getAllUsers() {
+    // Lógica de negócio aqui
+    return await database.users.findMany();
+  }
+
+  async createUser(data: any) {
+    // Lógica de validação e criação
+    return await database.users.create(data);
+  }
+}
+
+// UserController.ts
+import { UserService } from "../services/UserService";
+
+@Controller("/api/users")
+export class UserController {
+  private userService = new UserService();
+
+  @Get()
+  async getAllUsers(@Res() res: ResponseServer) {
+    const users = await this.userService.getAllUsers();
+    res.json({ users });
+  }
+
+  @Post()
+  async createUser(@Body() data: any, @Res() res: ResponseServer) {
+    const user = await this.userService.createUser(data);
+    res.status(201).json({ user });
+  }
+}
+```
+
+### 3. Formato de Resposta Consistente
+
+Use uma estrutura de resposta consistente:
+
+```typescript
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+@Controller("/api/users")
+export class UserController {
+  @Get()
+  getAll(@Res() res: ResponseServer) {
+    res.json({
+      success: true,
+      data: users
+    });
+  }
+
+  @Get("/:id")
+  getOne(@Param("id") id: string, @Res() res: ResponseServer) {
+    const user = users.find(u => u.id === id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "Usuário não encontrado"
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: user
+    });
+  }
+}
+```
+
+### 4. Tratamento de Erros
+
+Use blocos try-catch e respostas de erro consistentes:
+
+```typescript
+import { HttpError } from "azurajs";
+
+@Controller("/api/users")
+export class UserController {
+  @Post()
+  async createUser(@Body() data: any, @Res() res: ResponseServer) {
+    try {
+      // Validar
+      if (!data.email) {
+        throw new HttpError(400, "Email é obrigatório");
+      }
+      
+      // Criar usuário
+      const user = await this.userService.createUser(data);
+      
+      res.status(201).json({
+        success: true,
+        data: user
+      });
+    } catch (error) {
+      if (error instanceof HttpError) {
+        res.status(error.status).json({
+          success: false,
+          error: error.message
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: "Erro interno do servidor"
+        });
+      }
+    }
+  }
+}
+```
+
+### 5. Segurança de Tipos
+
+Use interfaces TypeScript para tipos de requisição/resposta:
+
+```typescript
+interface CreateUserDto {
+  name: string;
+  email: string;
+  password: string;
+}
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  createdAt: Date;
+}
+
+@Controller("/api/users")
+export class UserController {
+  @Post()
+  async createUser(
+    @Body() data: CreateUserDto, 
+    @Res() res: ResponseServer
+  ) {
+    const user: User = await this.userService.createUser(data);
+    res.status(201).json({ user });
+  }
+}
+```
+
+## Padrões Avançados 🚀
+
+### Injeção de Construtor
+
+Use o construtor para injetar dependências:
+
+```typescript
+import { UserService } from "../services/UserService";
+import { Logger } from "../utils/Logger";
+
+@Controller("/api/users")
+export class UserController {
+  constructor(
+    private userService: UserService,
+    private logger: Logger
+  ) {}
+
+  @Get()
+  async getAll(@Res() res: ResponseServer) {
+    this.logger.info("Buscando todos os usuários");
+    const users = await this.userService.getAllUsers();
+    res.json({ users });
+  }
+}
+```
+
+### Métodos Compartilhados
+
+Crie métodos compartilhados para operações comuns:
+
+```typescript
+@Controller("/api/users")
+export class UserController {
+  private userService = new UserService();
+
+  private sendSuccess(res: ResponseServer, data: any, status = 200) {
+    res.status(status).json({
+      success: true,
+      data
+    });
+  }
+
+  private sendError(res: ResponseServer, message: string, status = 400) {
+    res.status(status).json({
+      success: false,
+      error: message
+    });
+  }
+
+  @Get()
+  async getAll(@Res() res: ResponseServer) {
+    const users = await this.userService.getAllUsers();
+    this.sendSuccess(res, users);
+  }
+
+  @Post()
+  async create(@Body() data: any, @Res() res: ResponseServer) {
+    try {
+      const user = await this.userService.createUser(data);
+      this.sendSuccess(res, user, 201);
+    } catch (error: any) {
+      this.sendError(res, error.message, 400);
+    }
+  }
+}
+```
+
+## Próximos Passos 📖
+
+<Cards>
+  <Card title="Routing" href="routing" description="Aprenda sobre padrões de rota e parâmetros" />
+  <Card title="Decorators" href="decorators" description="Domine todos os decorators disponíveis" />
+  <Card title="Middleware" href="middleware" description="Adicione middleware aos controllers" />
+  <Card title="Validação" href="validation" description="Valide dados de requisição" />
+</Cards>

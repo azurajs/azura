@@ -1,0 +1,346 @@
+---
+title: Validation
+description: Validate request data with schemas and DTOs
+icon: CircleCheck
+---
+
+# Validation ✅
+
+AzuraJS provides built-in validation for request data using schemas and DTOs (Data Transfer Objects).
+
+## Schema Validation 📋
+
+Validate request bodies against TypeScript-like schemas.
+
+### Basic Schema
+
+```typescript
+import { validateSchema } from "azurajs";
+
+const userSchema = {
+  name: "string",
+  email: "string",
+  age: "number",
+};
+
+@Post()
+createUser(@Body() body: any, @Res() res: ResponseServer) {
+  try {
+    validateSchema(userSchema, body);
+    // Body is valid
+    res.status(201).json({ user: body });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+}
+```
+
+### Nested Schemas
+
+```typescript
+const addressSchema = {
+  street: "string",
+  city: "string",
+  zipCode: "string",
+};
+
+const userSchema = {
+  name: "string",
+  email: "string",
+  address: addressSchema,  // Nested object
+};
+
+validateSchema(userSchema, body);
+```
+
+### Array Schemas
+
+```typescript
+const userSchema = {
+  name: "string",
+  tags: ["string"],  // Array of strings
+  skills: [
+    {
+      name: "string",
+      level: "number",
+    }
+  ],  // Array of objects
+};
+```
+
+## DTO Validation 🎯
+
+Use the `@validateDto` decorator for class-based validation.
+
+### Creating a DTO
+
+```typescript
+class CreateUserDto {
+  name: string;
+  email: string;
+  password: string;
+  age?: number;
+
+  constructor(data: any) {
+    if (!data.name || typeof data.name !== "string") {
+      throw new Error("Name is required and must be a string");
+    }
+    if (!data.email || typeof data.email !== "string") {
+      throw new Error("Email is required and must be a string");
+    }
+    if (!data.password || typeof data.password !== "string") {
+      throw new Error("Password is required and must be a string");
+    }
+
+    this.name = data.name;
+    this.email = data.email;
+    this.password = data.password;
+    
+    if (data.age !== undefined) {
+      if (typeof data.age !== "number") {
+        throw new Error("Age must be a number");
+      }
+      this.age = data.age;
+    }
+  }
+}
+```
+
+### Using DTO in Controllers
+
+```typescript
+import { validateDto } from "azurajs";
+
+@Controller("/api/users")
+export class UserController {
+  @Post()
+  createUser(
+    @validateDto(CreateUserDto) data: CreateUserDto,
+    @Res() res: ResponseServer
+  ) {
+    // data is validated and typed
+    res.status(201).json({ user: data });
+  }
+}
+```
+
+## Custom Validators 🛠️
+
+Create reusable validation functions:
+
+```typescript
+// validators/email.ts
+export function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+// validators/password.ts
+export function isStrongPassword(password: string): boolean {
+  return password.length >= 8 && 
+         /[A-Z]/.test(password) &&
+         /[a-z]/.test(password) &&
+         /[0-9]/.test(password);
+}
+
+// Use in DTOs
+class CreateUserDto {
+  name: string;
+  email: string;
+  password: string;
+
+  constructor(data: any) {
+    // Validate name
+    if (!data.name || typeof data.name !== "string" || data.name.length < 2) {
+      throw new Error("Name must be at least 2 characters");
+    }
+
+    // Validate email
+    if (!data.email || !isValidEmail(data.email)) {
+      throw new Error("Invalid email format");
+    }
+
+    // Validate password
+    if (!data.password || !isStrongPassword(data.password)) {
+      throw new Error("Password must be at least 8 characters with uppercase, lowercase, and numbers");
+    }
+
+    this.name = data.name;
+    this.email = data.email;
+    this.password = data.password;
+  }
+}
+```
+
+## Validation with Zod 📦
+
+For more advanced validation, use Zod:
+
+```bash
+bun add zod
+```
+
+```typescript
+import { z } from "zod";
+
+// Define schema
+const createUserSchema = z.object({
+  name: z.string().min(2).max(50),
+  email: z.string().email(),
+  password: z.string().min(8),
+  age: z.number().int().positive().optional(),
+  role: z.enum(["user", "admin"]).default("user"),
+});
+
+type CreateUserDto = z.infer<typeof createUserSchema>;
+
+// Use in controller
+@Post()
+createUser(@Body() body: any, @Res() res: ResponseServer) {
+  try {
+    const data = createUserSchema.parse(body);
+    // data is validated and typed
+    res.status(201).json({ user: data });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ 
+        error: "Validation failed", 
+        details: error.errors 
+      });
+    }
+  }
+}
+```
+
+## Query Parameter Validation 🔍
+
+Validate query parameters:
+
+```typescript
+const searchQuerySchema = z.object({
+  q: z.string().min(1),
+  limit: z.string().regex(/^\d+$/).transform(Number).default("10"),
+  offset: z.string().regex(/^\d+$/).transform(Number).default("0"),
+});
+
+@Get("/search")
+search(@Query() query: any, @Res() res: ResponseServer) {
+  try {
+    const params = searchQuerySchema.parse(query);
+    // Search with validated params
+    res.json({ 
+      query: params.q, 
+      limit: params.limit, 
+      offset: params.offset 
+    });
+  } catch (error) {
+    res.status(400).json({ error: "Invalid query parameters" });
+  }
+}
+```
+
+## Path Parameter Validation 🛣️
+
+Validate path parameters:
+
+```typescript
+function isValidUUID(id: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+}
+
+@Get("/:id")
+getUser(@Param("id") id: string, @Res() res: ResponseServer) {
+  if (!isValidUUID(id)) {
+    return res.status(400).json({ error: "Invalid user ID format" });
+  }
+  
+  // Proceed with valid ID
+  res.json({ id });
+}
+```
+
+## Validation Middleware 🔌
+
+Create validation middleware:
+
+```typescript
+import { z } from "zod";
+import type { RequestHandler } from "azurajs";
+
+export function validateBody(schema: z.ZodSchema): RequestHandler {
+  return async (req, res, next) => {
+    try {
+      req.body = schema.parse(req.body);
+      await next();
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          error: "Validation failed",
+          details: error.errors,
+        });
+      } else {
+        await next();
+      }
+    }
+  };
+}
+
+// Usage
+const createUserSchema = z.object({
+  name: z.string(),
+  email: z.string().email(),
+});
+
+app.post("/api/users", validateBody(createUserSchema), (req, res) => {
+  // req.body is validated
+  res.json({ user: req.body });
+});
+```
+
+## Error Messages 📝
+
+Provide clear validation error messages:
+
+```typescript
+const userSchema = z.object({
+  name: z.string({
+    required_error: "Name is required",
+    invalid_type_error: "Name must be a string",
+  }).min(2, "Name must be at least 2 characters"),
+  
+  email: z.string({
+    required_error: "Email is required",
+  }).email("Invalid email format"),
+  
+  age: z.number({
+    invalid_type_error: "Age must be a number",
+  }).positive("Age must be positive").int("Age must be an integer"),
+});
+```
+
+## Best Practices ✨
+
+<Callout type="tip">
+  **Validate early**: Validate at the controller level before processing
+</Callout>
+
+<Callout type="tip">
+  **Consistent responses**: Return validation errors in a consistent format
+</Callout>
+
+<Callout type="tip">
+  **Reuse validators**: Create reusable validation functions and schemas
+</Callout>
+
+<Callout type="warn">
+  **Don't trust client data**: Always validate input from clients
+</Callout>
+
+## Next Steps 📖
+
+<Cards>
+  <Card title="Error Handling" href="error-handling" description="Handle validation errors properly" />
+  <Card title="TypeScript Support" href="typescript-support" description="Leverage TypeScript for type safety" />
+  <Card title="Examples" href="examples" description="See validation in action" />
+</Cards>

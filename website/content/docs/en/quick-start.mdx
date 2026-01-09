@@ -1,0 +1,283 @@
+---
+title: Quick Start
+description: Build your first API with AzuraJS in minutes
+icon: Rocket
+---
+
+# Quick Start 🚀
+
+Build your first RESTful API with AzuraJS in just a few minutes!
+
+## Step 1: Create Configuration File ⚙️
+
+Create `azura.config.ts` in your project root:
+
+```typescript title="azura.config.ts"
+import type { ConfigTypes } from "azurajs";
+
+const config: ConfigTypes = {
+  environment: "development",
+  server: {
+    port: 3000,
+    cluster: false,
+    ipHost: true,
+    https: false,
+  },
+  logging: {
+    enabled: true,
+    showDetails: true,
+  },
+  plugins: {
+    cors: {
+      enabled: true,
+      origins: ["*"],
+      methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+    },
+    rateLimit: {
+      enabled: false,
+      limit: 100,
+      timeframe: 60000, // 1 minute
+    },
+  },
+};
+
+export default config;
+```
+
+## Step 2: Create Your First Controller 🎯
+
+Create `src/controllers/UserController.ts`:
+
+```typescript title="src/controllers/UserController.ts"
+import { Controller, Get, Post, Put, Delete, Body, Param, Res } from "azurajs";
+import type { ResponseServer } from "azurajs";
+
+// In-memory database (for demo purposes)
+const users = [
+  { id: 1, name: "Alice", email: "alice@example.com" },
+  { id: 2, name: "Bob", email: "bob@example.com" },
+];
+
+@Controller("/api/users")
+export class UserController {
+  
+  // GET /api/users - Get all users
+  @Get()
+  getAllUsers(@Res() res: ResponseServer) {
+    res.json({ 
+      success: true, 
+      data: users 
+    });
+  }
+
+  // GET /api/users/:id - Get user by ID
+  @Get("/:id")
+  getUserById(@Param("id") id: string, @Res() res: ResponseServer) {
+    const user = users.find(u => u.id === Number(id));
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "User not found" 
+      });
+    }
+    
+    res.json({ success: true, data: user });
+  }
+
+  // POST /api/users - Create a new user
+  @Post()
+  createUser(@Body() body: any, @Res() res: ResponseServer) {
+    const newUser = {
+      id: users.length + 1,
+      name: body.name,
+      email: body.email,
+    };
+    
+    users.push(newUser);
+    
+    res.status(201).json({ 
+      success: true, 
+      data: newUser 
+    });
+  }
+
+  // PUT /api/users/:id - Update user
+  @Put("/:id")
+  updateUser(
+    @Param("id") id: string, 
+    @Body() body: any, 
+    @Res() res: ResponseServer
+  ) {
+    const user = users.find(u => u.id === Number(id));
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "User not found" 
+      });
+    }
+    
+    if (body.name) user.name = body.name;
+    if (body.email) user.email = body.email;
+    
+    res.json({ success: true, data: user });
+  }
+
+  // DELETE /api/users/:id - Delete user
+  @Delete("/:id")
+  deleteUser(@Param("id") id: string, @Res() res: ResponseServer) {
+    const index = users.findIndex(u => u.id === Number(id));
+    
+    if (index === -1) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "User not found" 
+      });
+    }
+    
+    users.splice(index, 1);
+    
+    res.json({ 
+      success: true, 
+      message: "User deleted successfully" 
+    });
+  }
+}
+```
+
+## Step 3: Create the Server 🖥️
+
+Create `src/index.ts`:
+
+```typescript title="src/index.ts"
+import { AzuraClient, applyDecorators, createLoggingMiddleware } from "azurajs";
+import { UserController } from "./controllers/UserController";
+
+// Create the application instance
+const app = new AzuraClient();
+
+// Add logging middleware
+const logger = createLoggingMiddleware(app.getConfig());
+app.use(logger);
+
+// Register controllers
+applyDecorators(app, [UserController]);
+
+// Start the server
+await app.listen();
+```
+
+## Step 4: Run Your Server 🏃
+
+Run your application:
+
+```bash
+# With Bun (recommended)
+bun run src/index.ts
+
+# With Node.js and tsx
+npx tsx src/index.ts
+
+# Or add to package.json scripts
+{
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts"
+  }
+}
+```
+
+You should see:
+
+```
+[master] listening on http://localhost:3000
+```
+
+## Step 5: Test Your API 🧪
+
+Test your endpoints using curl, Postman, or any HTTP client:
+
+### Get all users
+
+```bash
+curl http://localhost:3000/api/users
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": [
+    { "id": 1, "name": "Alice", "email": "alice@example.com" },
+    { "id": 2, "name": "Bob", "email": "bob@example.com" }
+  ]
+}
+```
+
+### Get user by ID
+
+```bash
+curl http://localhost:3000/api/users/1
+```
+
+### Create a new user
+
+```bash
+curl -X POST http://localhost:3000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Charlie","email":"charlie@example.com"}'
+```
+
+### Update a user
+
+```bash
+curl -X PUT http://localhost:3000/api/users/1 \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Alice Smith"}'
+```
+
+### Delete a user
+
+```bash
+curl -X DELETE http://localhost:3000/api/users/2
+```
+
+## 🎉 Congratulations!
+
+You've just built a complete RESTful API with AzuraJS! Here's what you learned:
+
+- ✅ How to configure AzuraJS
+- ✅ How to create controllers with decorators
+- ✅ How to use parameter decorators (`@Body`, `@Param`, `@Res`)
+- ✅ How to register controllers with `applyDecorators`
+- ✅ How to start the server
+
+## What's Next? 📚
+
+Now that you have a basic API running, explore more features:
+
+<Cards>
+  <Card title="Configuration" href="configuration" description="Deep dive into configuration options" />
+  <Card title="Controllers" href="controllers" description="Learn advanced controller patterns" />
+  <Card title="Validation" href="validation" description="Add request validation" />
+  <Card title="Middleware" href="middleware" description="Create custom middleware" />
+</Cards>
+
+## Pro Tips 💡
+
+<Callout type="tip">
+  **Hot Reload**: Use `tsx watch` or `bun --watch` for automatic server restart during development
+</Callout>
+
+<Callout type="tip">
+  **Multiple Controllers**: You can register multiple controllers at once:
+  ```typescript
+  applyDecorators(app, [UserController, PostController, AuthController]);
+  ```
+</Callout>
+
+<Callout type="tip">
+  **Environment Variables**: Use `process.env` in your config file for production settings
+</Callout>

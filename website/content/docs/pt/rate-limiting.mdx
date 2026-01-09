@@ -1,0 +1,491 @@
+---
+title: Rate Limiting
+description: Proteja sua API contra abuso com rate limiting
+icon: Shield
+---
+
+# Rate Limiting 🛡️
+
+Rate limiting protege sua API contra abuso limitando o número de requisições que um cliente pode fazer em um período de tempo.
+
+## Plugin Rate Limit Embutido 📦
+
+AzuraJS inclui um plugin de rate limiting pronto para uso:
+
+```typescript
+import { AzuraClient } from "azurajs";
+
+const app = new AzuraClient({
+  plugins: {
+    rateLimit: {
+      enabled: true,
+      windowMs: 60000,  // 1 minuto
+      max: 100,  // 100 requisições por janela
+      message: "Muitas requisições. Tente novamente mais tarde.",
+      statusCode: 429,
+      headers: true  // Adicionar cabeçalhos X-RateLimit-*
+    }
+  }
+});
+```
+
+## Configuração do Plugin 🚨
+
+### Opções Disponíveis
+
+```typescript
+interface RateLimitOptions {
+  enabled: boolean;          // Ativar/desativar
+  windowMs: number;          // Janela de tempo (ms)
+  max: number;               // Máximo de requisições por janela
+  message?: string;          // Mensagem de erro
+  statusCode?: number;       // Código de status (padrão: 429)
+  headers?: boolean;         // Incluir cabeçalhos X-RateLimit-*
+  skipSuccessfulRequests?: boolean;  // Não contar requisições bem-sucedidas
+  skipFailedRequests?: boolean;      // Não contar requisições com erro
+  keyGenerator?: (req: RequestServer) => string;  // Gerar chave customizada
+  skip?: (req: RequestServer) => boolean;         // Pular rate limit
+}
+```
+
+### Exemplo Completo
+
+```typescript
+const app = new AzuraClient({
+  plugins: {
+    rateLimit: {
+      enabled: true,
+      windowMs: 900000,  // 15 minutos
+      max: 100,
+      message: "Você atingiu o limite de requisições. Aguarde antes de tentar novamente.",
+      statusCode: 429,
+      headers: true,
+      skipSuccessfulRequests: false,
+      skipFailedRequests: true
+    }
+  }
+});
+```
+
+## Middleware Rate Limit Customizado 🔨
+
+Crie seu próprio middleware de rate limiting:
+
+```typescript
+interface RateLimitRecord {
+  count: number;
+  resetAt: number;
+}
+
+const store = new Map<string, RateLimitRecord>();
+
+function rateLimitMiddleware(
+  windowMs: number,
+  max: number
+) {
+  return (req: RequestServer, res: ResponseServer, next: () => void) => {
+    const key = req.ip;  // Usar IP como chave
+    const now = Date.now();
+    
+    let record = store.get(key);
+    
+    // Criar novo registro ou resetar se janela expirou
+    if (!record || now > record.resetAt) {
+      record = {
+        count: 1,
+        resetAt: now + windowMs
+      };
+      store.set(key, record);
+      return next();
+    }
+    
+    // Incrementar contador
+    record.count++;
+    
+    // Adicionar cabeçalhos
+    res.setHeader("X-RateLimit-Limit", max.toString());
+    res.setHeader("X-RateLimit-Remaining", Math.max(0, max - record.count).toString());
+    res.setHeader("X-RateLimit-Reset", new Date(record.resetAt).toISOString());
+    
+    // Verificar limite
+    if (record.count > max) {
+      return res.status(429).json({
+        error: "Muitas requisições",
+        retryAfter: Math.ceil((record.resetAt - now) / 1000)
+      });
+    }
+    
+    next();
+  };
+}
+
+app.use(rateLimitMiddleware(60000, 100));  // 100 req/min
+```
+
+## Rate Limit por Rota 🎯
+
+Aplique diferentes limites a diferentes rotas:
+
+```typescript
+// Rate limit restrito para autenticação
+const authRateLimit = rateLimitMiddleware(900000, 5);  // 5 tentativas em 15 min
+
+// Rate limit normal para API
+const apiRateLimit = rateLimitMiddleware(60000, 100);  // 100 req/min
+
+// Aplicar middlewares
+app.use("/auth/login", authRateLimit);
+app.use("/auth/register", authRateLimit);
+app.use("/api", apiRateLimit);
+```
+
+## Rate Limit por Usuário 👤
+
+Use ID de usuário em vez de IP:
+
+```typescript
+function userRateLimitMiddleware(
+  windowMs: number,
+  max: number
+) {
+  const store = new Map<string, RateLimitRecord>();
+  
+  return (req: RequestServer, res: ResponseServer, next: () => void) => {
+    // Obter ID do usuário do token ou sessão
+    const userId = req.user?.id || req.ip;  // Fallback para IP
+    const now = Date.now();
+    
+    let record = store.get(userId);
+    
+    if (!record || now > record.resetAt) {
+      record = { count: 1, resetAt: now + windowMs };
+      store.set(userId, record);
+      return next();
+    }
+    
+    record.count++;
+    
+    if (record.count > max) {
+      return res.status(429).json({
+        error: "Limite de requisições atingido",
+        userId
+      });
+    }
+    
+    next();
+  };
+}
+
+// Aplicar após middleware de autenticação
+app.use(authMiddleware);
+app.use(userRateLimitMiddleware(60000, 1000));  // 1000 req/min por usuário
+```
+
+## Rate Limit Distribuído com Redis 🔴
+
+Para aplicações com múltiplas instâncias, use Redis:
+
+```typescript
+import { createClient } from "redis";
+
+const redis = createClient({ url: "redis://localhost:6379" });
+await redis.connect();
+
+function redisRateLimitMiddleware(
+  windowMs: number,
+  max: number
+) {
+  return async (req: RequestServer, res: ResponseServer, next: () => void) => {
+    const key = `rate-limit:${req.ip}`;
+    const now = Date.now();
+    
+    try {
+      // Obter contador atual
+      const data = await redis.get(key);
+      let record: RateLimitRecord;
+      
+      if (!data) {
+        // Criar novo registro
+        record = { count: 1, resetAt: now + windowMs };
+        await redis.setEx(key, Math.ceil(windowMs / 1000), JSON.stringify(record));
+        return next();
+      }
+      
+      record = JSON.parse(data);
+      
+      // Verificar se janela expirou
+      if (now > record.resetAt) {
+        record = { count: 1, resetAt: now + windowMs };
+        await redis.setEx(key, Math.ceil(windowMs / 1000), JSON.stringify(record));
+        return next();
+      }
+      
+      // Incrementar contador
+      record.count++;
+      await redis.setEx(key, Math.ceil((record.resetAt - now) / 1000), JSON.stringify(record));
+      
+      // Verificar limite
+      if (record.count > max) {
+        return res.status(429).json({
+          error: "Muitas requisições",
+          retryAfter: Math.ceil((record.resetAt - now) / 1000)
+        });
+      }
+      
+      next();
+    } catch (error) {
+      console.error("Redis rate limit error:", error);
+      next();  // Falhar aberto em caso de erro do Redis
+    }
+  };
+}
+
+app.use(redisRateLimitMiddleware(60000, 100));
+```
+
+## Rate Limit com Sliding Window 📊
+
+Implementação mais precisa com janela deslizante:
+
+```typescript
+interface SlidingWindowRecord {
+  requests: number[];  // Timestamps das requisições
+}
+
+const store = new Map<string, SlidingWindowRecord>();
+
+function slidingWindowRateLimit(
+  windowMs: number,
+  max: number
+) {
+  return (req: RequestServer, res: ResponseServer, next: () => void) => {
+    const key = req.ip;
+    const now = Date.now();
+    const windowStart = now - windowMs;
+    
+    let record = store.get(key);
+    
+    if (!record) {
+      record = { requests: [] };
+      store.set(key, record);
+    }
+    
+    // Remover requisições antigas
+    record.requests = record.requests.filter(timestamp => timestamp > windowStart);
+    
+    // Adicionar requisição atual
+    record.requests.push(now);
+    
+    // Adicionar cabeçalhos
+    res.setHeader("X-RateLimit-Limit", max.toString());
+    res.setHeader("X-RateLimit-Remaining", Math.max(0, max - record.requests.length).toString());
+    
+    // Verificar limite
+    if (record.requests.length > max) {
+      return res.status(429).json({
+        error: "Muitas requisições",
+        current: record.requests.length,
+        limit: max
+      });
+    }
+    
+    next();
+  };
+}
+
+app.use(slidingWindowRateLimit(60000, 100));
+```
+
+## Rate Limit por Endpoint 🛣️
+
+Diferentes limites para diferentes endpoints:
+
+```typescript
+@Controller("/api")
+export class ApiController {
+  @Post("/expensive-operation")
+  expensiveOp(@Req() req: RequestServer, @Res() res: ResponseServer) {
+    // Verificar rate limit específico
+    const key = `expensive:${req.ip}`;
+    const limit = checkRateLimit(key, 600000, 5);  // 5 por 10 min
+    
+    if (!limit.allowed) {
+      return res.status(429).json({
+        error: "Operação limitada a 5 por 10 minutos"
+      });
+    }
+    
+    // Executar operação
+    return { result: "ok" };
+  }
+
+  @Get("/public-data")
+  publicData(@Req() req: RequestServer, @Res() res: ResponseServer) {
+    // Rate limit mais permissivo
+    const key = `public:${req.ip}`;
+    const limit = checkRateLimit(key, 60000, 1000);  // 1000 por min
+    
+    if (!limit.allowed) {
+      return res.status(429).json({ error: "Rate limit exceeded" });
+    }
+    
+    return { data: "public" };
+  }
+}
+
+function checkRateLimit(key: string, windowMs: number, max: number) {
+  // Implementação similar aos exemplos anteriores
+  // ...
+  return { allowed: true, remaining: max };
+}
+```
+
+## Whitelist e Blacklist 📝
+
+Skip rate limiting para IPs confiáveis:
+
+```typescript
+const WHITELISTED_IPS = new Set([
+  "127.0.0.1",
+  "::1",
+  "10.0.0.1"  // IP interno
+]);
+
+const BLACKLISTED_IPS = new Set([
+  "192.168.1.100"  // IP banido
+]);
+
+function rateLimitWithWhitelist(
+  windowMs: number,
+  max: number
+) {
+  return (req: RequestServer, res: ResponseServer, next: () => void) => {
+    const ip = req.ip;
+    
+    // Bloquear IPs banidos
+    if (BLACKLISTED_IPS.has(ip)) {
+      return res.status(403).json({ error: "IP banido" });
+    }
+    
+    // Pular rate limit para IPs confiáveis
+    if (WHITELISTED_IPS.has(ip)) {
+      return next();
+    }
+    
+    // Aplicar rate limit normal
+    // ... implementação de rate limit
+    next();
+  };
+}
+
+app.use(rateLimitWithWhitelist(60000, 100));
+```
+
+## Cabeçalhos de Rate Limit 📋
+
+Adicione cabeçalhos informativos:
+
+```typescript
+function addRateLimitHeaders(
+  res: ResponseServer,
+  limit: number,
+  remaining: number,
+  resetAt: number
+) {
+  res.setHeader("X-RateLimit-Limit", limit.toString());
+  res.setHeader("X-RateLimit-Remaining", remaining.toString());
+  res.setHeader("X-RateLimit-Reset", resetAt.toString());
+  res.setHeader("Retry-After", Math.ceil((resetAt - Date.now()) / 1000).toString());
+}
+```
+
+## Exemplos Práticos 🎨
+
+### Rate Limit para API REST
+
+```typescript
+const app = new AzuraClient({
+  plugins: {
+    rateLimit: {
+      enabled: true,
+      windowMs: 900000,  // 15 minutos
+      max: 1000,
+      headers: true
+    }
+  }
+});
+
+// Rate limit mais restrito para operações de escrita
+const writeRateLimit = rateLimitMiddleware(60000, 50);  // 50 escritas/min
+
+app.use("/api", apiRateLimit);
+app.post("*", writeRateLimit);
+app.put("*", writeRateLimit);
+app.delete("*", writeRateLimit);
+```
+
+### Rate Limit para Autenticação
+
+```typescript
+const authRateLimit = rateLimitMiddleware(900000, 5);  // 5 tentativas/15min
+
+@Controller("/auth")
+export class AuthController {
+  @Post("/login")
+  async login(
+    @Body() credentials: any,
+    @Req() req: RequestServer,
+    @Res() res: ResponseServer
+  ) {
+    // Verificar rate limit manualmente
+    const key = `login:${req.ip}`;
+    const limit = checkRateLimit(key, 900000, 5);
+    
+    if (!limit.allowed) {
+      return res.status(429).json({
+        error: "Muitas tentativas de login",
+        retryAfter: limit.retryAfter
+      });
+    }
+    
+    // Tentar autenticar
+    const user = await authenticate(credentials);
+    
+    if (!user) {
+      return res.status(401).json({ error: "Credenciais inválidas" });
+    }
+    
+    res.json({ user });
+  }
+}
+```
+
+## Melhores Práticas ✨
+
+<Callout type="tip">
+  **Use Redis para ambientes distribuídos**: Garante limites consistentes em múltiplas instâncias
+</Callout>
+
+<Callout type="tip">
+  **Diferentes limites para diferentes endpoints**: Proteja operações sensíveis com limites mais rigorosos
+</Callout>
+
+<Callout type="tip">
+  **Sempre adicione cabeçalhos**: Ajude clientes a entender os limites
+</Callout>
+
+<Callout type="warn">
+  **Cuidado com proxies**: Use `req.ip` que considera cabeçalhos X-Forwarded-For
+</Callout>
+
+<Callout type="warn">
+  **Não bloqueie tudo**: Whitelist IPs internos e de monitoramento
+</Callout>
+
+## Próximos Passos 📖
+
+<Cards>
+  <Card title="CORS" href="cors" description="Configure CORS" />
+  <Card title="Middleware" href="middleware" description="Crie middleware customizado" />
+  <Card title="Error Handling" href="error-handling" description="Trate erros de rate limit" />
+</Cards>

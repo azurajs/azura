@@ -1,0 +1,389 @@
+---
+title: Configuration
+description: Configure your AzuraJS application
+icon: Settings
+---
+
+# Configuration ⚙️
+
+AzuraJS uses a file-based configuration system that supports TypeScript, JSON, and YAML formats.
+
+## Configuration File 📄
+
+Create an `azura.config.ts` file in your project root:
+
+```typescript title="azura.config.ts"
+import type { ConfigTypes } from "azurajs";
+
+const config: ConfigTypes = {
+  environment: "development",
+  server: {
+    port: 3000,
+    cluster: false,
+    ipHost: true,
+    https: false,
+  },
+  logging: {
+    enabled: true,
+    showDetails: true,
+  },
+  plugins: {
+    cors: {
+      enabled: true,
+      origins: ["*"],
+      methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+    },
+    rateLimit: {
+      enabled: false,
+      limit: 100,
+      timeframe: 60000,
+    },
+  },
+};
+
+export default config;
+```
+
+## Configuration Options 🔧
+
+### Environment
+
+```typescript
+environment: "development" | "production" | "test"
+```
+
+Sets the application environment. Affects logging behavior and other environment-specific features.
+
+<Callout type="info">
+  In production mode, detailed logging is automatically disabled for better performance.
+</Callout>
+
+### Server Configuration
+
+#### port
+
+```typescript
+port: number
+```
+
+The port number your server will listen on. Default: `3000`
+
+```typescript
+server: {
+  port: 8080
+}
+```
+
+#### cluster
+
+```typescript
+cluster: boolean
+```
+
+Enable cluster mode to utilize all CPU cores. Default: `false`
+
+```typescript
+server: {
+  cluster: true  // Spawns a worker for each CPU core
+}
+```
+
+<Callout type="warn">
+  Cluster mode is recommended for production but not necessary for development.
+</Callout>
+
+#### ipHost
+
+```typescript
+ipHost: boolean
+```
+
+Display local network IP address on startup. Default: `false`
+
+```typescript
+server: {
+  ipHost: true  // Shows: http://192.168.1.100:3000
+}
+```
+
+#### https
+
+```typescript
+https: boolean
+```
+
+Indicates if the server is running behind HTTPS. Affects the `req.protocol` property. Default: `false`
+
+### Logging Configuration 📝
+
+#### enabled
+
+```typescript
+enabled: boolean
+```
+
+Enable/disable request logging. Default: `true`
+
+#### showDetails
+
+```typescript
+showDetails: boolean
+```
+
+Show detailed request/response information including:
+- Request method and path
+- Response status code
+- Response time
+- Request body (in development)
+
+```typescript
+logging: {
+  enabled: true,
+  showDetails: true
+}
+```
+
+Example output:
+```
+→ POST /api/users 201 Created (15ms)
+```
+
+### CORS Plugin 🌐
+
+Configure Cross-Origin Resource Sharing for your API.
+
+#### enabled
+
+```typescript
+enabled: boolean
+```
+
+Enable/disable CORS plugin. Default: `false`
+
+#### origins
+
+```typescript
+origins: string | string[]
+```
+
+Allowed origins for CORS requests.
+
+```typescript
+cors: {
+  enabled: true,
+  origins: ["https://example.com", "https://app.example.com"]
+  // or allow all: origins: ["*"]
+}
+```
+
+#### methods
+
+```typescript
+methods: string | string[]
+```
+
+Allowed HTTP methods.
+
+```typescript
+cors: {
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+}
+```
+
+#### allowedHeaders
+
+```typescript
+allowedHeaders: string | string[]
+```
+
+Allowed request headers.
+
+```typescript
+cors: {
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+}
+```
+
+### Rate Limiting Plugin 🛡️
+
+Protect your API from abuse with built-in rate limiting.
+
+#### enabled
+
+```typescript
+enabled: boolean
+```
+
+Enable/disable rate limiting. Default: `false`
+
+#### limit
+
+```typescript
+limit: number
+```
+
+Maximum number of requests per timeframe.
+
+```typescript
+rateLimit: {
+  enabled: true,
+  limit: 100  // 100 requests per timeframe
+}
+```
+
+#### timeframe
+
+```typescript
+timeframe: number
+```
+
+Timeframe in milliseconds.
+
+```typescript
+rateLimit: {
+  limit: 100,
+  timeframe: 60000  // 100 requests per minute
+}
+```
+
+<Callout type="warn">
+  When rate limit is exceeded, the server responds with `429 Too Many Requests`
+</Callout>
+
+## Environment-Specific Configuration 🌍
+
+Use environment variables for different deployment environments:
+
+```typescript title="azura.config.ts"
+import type { ConfigTypes } from "azurajs";
+
+const isDev = process.env.NODE_ENV !== "production";
+const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+
+const config: ConfigTypes = {
+  environment: isDev ? "development" : "production",
+  server: {
+    port,
+    cluster: !isDev,  // Enable cluster only in production
+    ipHost: isDev,    // Show IP only in development
+    https: !isDev,
+  },
+  logging: {
+    enabled: true,
+    showDetails: isDev,  // Detailed logs only in development
+  },
+  plugins: {
+    cors: {
+      enabled: true,
+      origins: isDev 
+        ? ["*"] 
+        : ["https://yourdomain.com"],
+    },
+    rateLimit: {
+      enabled: !isDev,  // Rate limit only in production
+      limit: 100,
+      timeframe: 60000,
+    },
+  },
+};
+
+export default config;
+```
+
+## JSON Configuration 📋
+
+You can also use JSON format:
+
+```json title="azura.config.json"
+{
+  "environment": "development",
+  "server": {
+    "port": 3000,
+    "cluster": false
+  },
+  "logging": {
+    "enabled": true,
+    "showDetails": true
+  }
+}
+```
+
+## YAML Configuration 📄
+
+Or YAML format:
+
+```yaml title="azura.config.yaml"
+environment: development
+server:
+  port: 3000
+  cluster: false
+logging:
+  enabled: true
+  showDetails: true
+```
+
+## Accessing Configuration at Runtime 🔍
+
+You can access the configuration in your application:
+
+```typescript
+const app = new AzuraClient();
+const config = app.getConfig();
+
+console.log(`Server port: ${config.server?.port}`);
+console.log(`Environment: ${config.environment}`);
+```
+
+## Full Configuration Example 📚
+
+Here's a complete production-ready configuration:
+
+```typescript title="azura.config.ts"
+import type { ConfigTypes } from "azurajs";
+
+const config: ConfigTypes = {
+  environment: "production",
+  server: {
+    port: 8080,
+    cluster: true,
+    ipHost: false,
+    https: true,
+  },
+  logging: {
+    enabled: true,
+    showDetails: false,
+  },
+  plugins: {
+    cors: {
+      enabled: true,
+      origins: [
+        "https://yourdomain.com",
+        "https://app.yourdomain.com"
+      ],
+      methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+      allowedHeaders: [
+        "Content-Type", 
+        "Authorization",
+        "X-API-Key"
+      ],
+    },
+    rateLimit: {
+      enabled: true,
+      limit: 1000,
+      timeframe: 60000, // 1000 requests per minute
+    },
+  },
+};
+
+export default config;
+```
+
+## Next Steps 📖
+
+<Cards>
+  <Card title="Controllers" href="controllers" description="Learn about controller patterns" />
+  <Card title="Middleware" href="middleware" description="Add custom middleware" />
+  <Card title="CORS" href="cors" description="Deep dive into CORS configuration" />
+  <Card title="Rate Limiting" href="rate-limiting" description="Advanced rate limiting patterns" />
+</Cards>

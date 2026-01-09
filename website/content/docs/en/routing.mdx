@@ -1,0 +1,299 @@
+---
+title: Routing
+description: Learn about route patterns, parameters, and matching
+icon: Route
+---
+
+# Routing 🛣️
+
+AzuraJS provides a powerful and flexible routing system based on decorators and pattern matching.
+
+## Route Basics 📍
+
+Routes are defined using HTTP method decorators on controller methods.
+
+```typescript
+@Controller("/api/users")
+export class UserController {
+  @Get()  // Matches: GET /api/users
+  getAllUsers() {}
+
+  @Get("/:id")  // Matches: GET /api/users/123
+  getUser(@Param("id") id: string) {}
+}
+```
+
+## Route Paths 🗺️
+
+### Static Paths
+
+```typescript
+@Get("/users")  // Exact match only
+getUsers() {}
+
+@Get("/users/active")  // Exact match
+getActiveUsers() {}
+```
+
+### Dynamic Parameters
+
+Use `:paramName` for route parameters:
+
+```typescript
+@Get("/:id")  // Matches /123, /abc, etc.
+getOne(@Param("id") id: string) {}
+
+@Get("/:userId/posts/:postId")  // Multiple parameters
+getPost(
+  @Param("userId") userId: string,
+  @Param("postId") postId: string
+) {}
+```
+
+### Query Parameters
+
+Query parameters are not part of the route path:
+
+```typescript
+// Route: GET /search
+// URL: GET /search?q=john&limit=10
+@Get("/search")
+search(@Query("q") query: string, @Query("limit") limit: string) {
+  return { query, limit };
+}
+```
+
+## Route Patterns 🎨
+
+### Combining Static and Dynamic
+
+```typescript
+@Controller("/api")
+export class ApiController {
+  @Get("/users/:id/profile")  // GET /api/users/123/profile
+  getProfile(@Param("id") id: string) {}
+
+  @Get("/posts/:id/comments/:commentId")  // Multiple params
+  getComment(
+    @Param("id") postId: string,
+    @Param("commentId") commentId: string
+  ) {}
+}
+```
+
+### Nested Routes
+
+```typescript
+@Controller("/api/organizations")
+export class OrgController {
+  @Get("/:orgId/teams/:teamId/members")
+  getMembers(
+    @Param("orgId") orgId: string,
+    @Param("teamId") teamId: string
+  ) {
+    return { orgId, teamId };
+  }
+}
+```
+
+## Route Priority ⚡
+
+Routes are matched in the order they're registered. More specific routes should be defined first:
+
+```typescript
+@Controller("/api/users")
+export class UserController {
+  // ✅ Correct order
+  @Get("/me")  // Specific route first
+  getCurrentUser() {}
+
+  @Get("/:id")  // Generic route after
+  getUser(@Param("id") id: string) {}
+
+  // ❌ Wrong order
+  @Get("/:id")  // This would match /me
+  getUser2(@Param("id") id: string) {}
+
+  @Get("/me")  // Never reached!
+  getCurrentUser2() {}
+}
+```
+
+## HTTP Methods 🔧
+
+All standard HTTP methods are supported:
+
+```typescript
+@Controller("/api/posts")
+export class PostController {
+  @Get()  // Read all
+  getAll() {}
+
+  @Get("/:id")  // Read one
+  getOne(@Param("id") id: string) {}
+
+  @Post()  // Create
+  create(@Body() data: any) {}
+
+  @Put("/:id")  // Update (full)
+  update(@Param("id") id: string, @Body() data: any) {}
+
+  @Patch("/:id")  // Update (partial)
+  patch(@Param("id") id: string, @Body() data: any) {}
+
+  @Delete("/:id")  // Delete
+  remove(@Param("id") id: string) {}
+
+  @Head("/:id")  // Check existence
+  exists(@Param("id") id: string, @Res() res: ResponseServer) {
+    res.status(200).end();
+  }
+
+  @Options()  // CORS preflight
+  options(@Res() res: ResponseServer) {
+    res.set("Allow", "GET, POST").end();
+  }
+}
+```
+
+## Programmatic Routes 🔨
+
+You can also define routes programmatically without decorators:
+
+```typescript
+const app = new AzuraClient();
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.post("/api/webhook", (req, res) => {
+  console.log("Webhook received:", req.body);
+  res.status(200).send("OK");
+});
+
+app.put("/api/items/:id", (req, res) => {
+  res.json({ id: req.params.id });
+});
+```
+
+## Route Helpers 🛠️
+
+### Multiple Routes per Method
+
+```typescript
+// Not directly supported, but you can create a wrapper
+@Controller("/api/posts")
+export class PostController {
+  private getPostsLogic() {
+    return { posts: [] };
+  }
+
+  @Get()
+  getPosts() {
+    return this.getPostsLogic();
+  }
+
+  @Get("/all")
+  getAllPosts() {
+    return this.getPostsLogic();
+  }
+}
+```
+
+### Route Groups
+
+Use controllers to group related routes:
+
+```typescript
+// Auth routes
+@Controller("/auth")
+export class AuthController {
+  @Post("/login")
+  login() {}
+
+  @Post("/register")
+  register() {}
+
+  @Post("/logout")
+  logout() {}
+}
+
+// Public API routes
+@Controller("/api/public")
+export class PublicController {}
+
+// Admin routes
+@Controller("/api/admin")
+export class AdminController {}
+```
+
+## RESTful Routing 🎯
+
+Follow REST conventions for resource-based APIs:
+
+```typescript
+@Controller("/api/users")
+export class UserController {
+  @Get()  // GET /api/users - List all users
+  index() {}
+
+  @Post()  // POST /api/users - Create user
+  store(@Body() data: any) {}
+
+  @Get("/:id")  // GET /api/users/:id - Get one user
+  show(@Param("id") id: string) {}
+
+  @Put("/:id")  // PUT /api/users/:id - Update user
+  update(@Param("id") id: string, @Body() data: any) {}
+
+  @Delete("/:id")  // DELETE /api/users/:id - Delete user
+  destroy(@Param("id") id: string) {}
+}
+```
+
+## Route Testing 🧪
+
+Test your routes:
+
+```typescript
+import { AzuraClient, applyDecorators } from "azurajs";
+import { UserController } from "./controllers/UserController";
+
+const app = new AzuraClient();
+applyDecorators(app, [UserController]);
+
+// Start server
+await app.listen(3000);
+
+// Test endpoints
+const response = await fetch("http://localhost:3000/api/users/123");
+const data = await response.json();
+console.log(data);
+```
+
+## Best Practices ✨
+
+<Callout type="tip">
+  **Use consistent naming**: Follow REST conventions (index, show, store, update, destroy)
+</Callout>
+
+<Callout type="tip">
+  **Keep routes flat**: Avoid deeply nested routes (max 2-3 levels)
+</Callout>
+
+<Callout type="tip">
+  **Use plural nouns**: `/users` instead of `/user`, `/posts` instead of `/post`
+</Callout>
+
+<Callout type="warn">
+  **Watch route order**: Specific routes before generic ones
+</Callout>
+
+## Next Steps 📖
+
+<Cards>
+  <Card title="Decorators" href="decorators" description="Master all decorators" />
+  <Card title="Middleware" href="middleware" description="Add middleware to routes" />
+  <Card title="Validation" href="validation" description="Validate route parameters" />
+</Cards>

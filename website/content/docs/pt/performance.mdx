@@ -1,0 +1,553 @@
+---
+title: Performance
+description: Otimize sua aplicação AzuraJS para máximo desempenho
+icon: Lightbulb
+---
+
+# Performance 💡
+
+Aprenda técnicas e melhores práticas para maximizar o desempenho da sua aplicação AzuraJS.
+
+## Cluster Mode 🖥️
+
+A maneira mais eficaz de melhorar o desempenho é usar cluster mode para utilizar todos os núcleos da CPU:
+
+```typescript
+import cluster from "cluster";
+import { cpus } from "os";
+
+if (cluster.isPrimary) {
+  const numCPUs = cpus().length;
+  
+  for (let i = 0; i < numCPUs; i++) {
+    cluster.fork();
+  }
+} else {
+  const app = new AzuraClient();
+  await app.listen(3000);
+}
+```
+
+**Ganhos esperados:**
+- 4 cores: ~3.5x throughput
+- 8 cores: ~7x throughput
+- 16 cores: ~14x throughput
+
+## Caching Estratégico 💾
+
+### Cache em Memória
+
+```typescript
+const cache = new Map<string, { data: any; expires: number }>();
+
+function cacheMiddleware(ttl: number) {
+  return (req: RequestServer, res: ResponseServer, next: () => void) => {
+    if (req.method !== "GET") {
+      return next();
+    }
+    
+    const key = req.url;
+    const cached = cache.get(key);
+    
+    // Verificar cache
+    if (cached && Date.now() < cached.expires) {
+      return res.json(cached.data);
+    }
+    
+    // Interceptar resposta
+    const originalJson = res.json.bind(res);
+    res.json = function(data: any) {
+      cache.set(key, { data, expires: Date.now() + ttl });
+      return originalJson(data);
+    };
+    
+    next();
+  };
+}
+
+// Cache de 5 minutos para dados públicos
+app.use("/api/public", cacheMiddleware(300000));
+```
+
+### Cache com Redis
+
+```typescript
+import { createClient } from "redis";
+
+const redis = createClient();
+await redis.connect();
+
+async function redisCacheMiddleware(
+  req: RequestServer,
+  res: ResponseServer,
+  next: () => void
+) {
+  if (req.method !== "GET") {
+    return next();
+  }
+  
+  const key = `cache:${req.url}`;
+  
+  try {
+    const cached = await redis.get(key);
+    
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
+    
+    const originalJson = res.json.bind(res);
+    res.json = async function(data: any) {
+      await redis.setEx(key, 300, JSON.stringify(data));
+      return originalJson(data);
+    };
+    
+    next();
+  } catch (error) {
+    next();  // Falhar aberto
+  }
+}
+
+app.use(redisCacheMiddleware);
+```
+
+## Otimização de Banco de Dados 🗄️
+
+### Connection Pooling
+
+```typescript
+import { Pool } from "pg";
+
+const pool = new Pool({
+  host: "localhost",
+  port: 5432,
+  database: "mydb",
+  user: "user",
+  password: "password",
+  max: 20,  // Máximo de 20 conexões
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000
+});
+
+@Get("/users")
+async getUsers() {
+  const client = await pool.connect();
+  try {
+    const result = await client.query("SELECT * FROM users");
+    return { users: result.rows };
+  } finally {
+    client.release();
+  }
+}
+```
+
+### Query Optimization
+
+```typescript
+// ❌ N+1 Query Problem
+async function getBadPosts() {
+  const posts = await db.query("SELECT * FROM posts");
+  
+  for (const post of posts) {
+    post.author = await db.query("SELECT * FROM users WHERE id = $1", [post.authorId]);
+  }
+  
+  return posts;
+}
+
+// ✅ Single Query with JOIN
+async function getGoodPosts() {
+  const posts = await db.query(`
+    SELECT posts.*, users.name as author_name, users.email as author_email
+    FROM posts
+    LEFT JOIN users ON posts.author_id = users.id
+  `);
+  
+  return posts;
+}
+```
+
+### Índices
+
+```sql
+-- Criar índices para queries frequentes
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_posts_author_id ON posts(author_id);
+CREATE INDEX idx_posts_created_at ON posts(created_at DESC);
+
+-- Índice composto para queries específicas
+CREATE INDEX idx_posts_status_created ON posts(status, created_at DESC);
+```
+
+## Paginação Eficiente 📄
+
+```typescript
+interface PaginationQuery {
+  page: number;
+  limit: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
+
+@Get("/posts")
+async getPosts(@Query() query: PaginationQuery) {
+  const page = Math.max(1, query.page || 1);
+  const limit = Math.min(100, Math.max(1, query.limit || 10));
+  const offset = (page - 1) * limit;
+  const sortBy = query.sortBy || "created_at";
+  const sortOrder = query.sortOrder || "desc";
+  
+  // Query com LIMIT e OFFSET
+  const posts = await db.query(`
+    SELECT * FROM posts
+    ORDER BY ${sortBy} ${sortOrder}
+    LIMIT $1 OFFSET $2
+  `, [limit, offset]);
+  
+  // Count total (pode ser cacheado)
+  const total = await db.query("SELECT COUNT(*) FROM posts");
+  
+  return {
+    posts,
+    pagination: {
+      page,
+      limit,
+      total: total.rows[0].count,
+      totalPages: Math.ceil(total.rows[0].count / limit)
+    }
+  };
+}
+```
+
+## Compression 🗜️
+
+```typescript
+import { gzipSync } from "zlib";
+
+function compressionMiddleware(req: RequestServer, res: ResponseServer, next: () => void) {
+  const acceptEncoding = req.headers["accept-encoding"] || "";
+  
+  if (!acceptEncoding.includes("gzip")) {
+    return next();
+  }
+  
+  const originalJson = res.json.bind(res);
+  const originalSend = res.send.bind(res);
+  
+  res.json = function(data: any) {
+    const json = JSON.stringify(data);
+    const compressed = gzipSync(json);
+    
+    res.setHeader("Content-Encoding", "gzip");
+    res.setHeader("Content-Type", "application/json");
+    return originalSend(compressed);
+  };
+  
+  next();
+}
+
+app.use(compressionMiddleware);
+```
+
+## Lazy Loading 🔄
+
+```typescript
+// Carregar apenas o necessário
+@Get("/posts/:id")
+async getPost(@Param("id") id: string, @Query("include") include: string) {
+  const post = await db.query("SELECT * FROM posts WHERE id = $1", [id]);
+  
+  // Carregar relacionamentos apenas se solicitado
+  if (include?.includes("author")) {
+    post.author = await db.query("SELECT * FROM users WHERE id = $1", [post.authorId]);
+  }
+  
+  if (include?.includes("comments")) {
+    post.comments = await db.query("SELECT * FROM comments WHERE post_id = $1", [post.id]);
+  }
+  
+  return { post };
+}
+```
+
+## Rate Limiting Inteligente 🛡️
+
+```typescript
+// Rate limit mais alto para usuários autenticados
+function smartRateLimit(req: RequestServer, res: ResponseServer, next: () => void) {
+  const isAuthenticated = !!req.user;
+  
+  const limit = isAuthenticated ? 1000 : 100;  // 10x mais para usuários autenticados
+  const windowMs = 60000;  // 1 minuto
+  
+  const key = isAuthenticated ? `auth:${req.user.id}` : `anon:${req.ip}`;
+  
+  // Implementar rate limiting com limite dinâmico
+  const allowed = checkRateLimit(key, windowMs, limit);
+  
+  if (!allowed) {
+    return res.status(429).json({ error: "Rate limit excedido" });
+  }
+  
+  next();
+}
+```
+
+## Async/Await vs Promises.all 🔀
+
+```typescript
+// ❌ Lento - Execução sequencial
+async function slowFetch() {
+  const users = await fetchUsers();      // Espera 100ms
+  const posts = await fetchPosts();      // Espera 100ms
+  const comments = await fetchComments();  // Espera 100ms
+  // Total: 300ms
+  
+  return { users, posts, comments };
+}
+
+// ✅ Rápido - Execução paralela
+async function fastFetch() {
+  const [users, posts, comments] = await Promise.all([
+    fetchUsers(),      // Executa em paralelo
+    fetchPosts(),      // Executa em paralelo
+    fetchComments()    // Executa em paralelo
+  ]);
+  // Total: 100ms (tempo da operação mais lenta)
+  
+  return { users, posts, comments };
+}
+```
+
+## Streaming 🌊
+
+Para respostas grandes, use streaming:
+
+```typescript
+import { createReadStream } from "fs";
+
+@Get("/download/large-file")
+downloadFile(@Res() res: ResponseServer) {
+  const stream = createReadStream("./large-file.csv");
+  
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", "attachment; filename=data.csv");
+  
+  stream.pipe(res);
+}
+```
+
+## Evitar Bloqueio da Event Loop 🔄
+
+```typescript
+// ❌ Ruim - Bloqueia event loop
+@Get("/heavy")
+heavyComputation() {
+  let result = 0;
+  for (let i = 0; i < 10000000000; i++) {
+    result += i;
+  }
+  return { result };
+}
+
+// ✅ Bom - Usa worker threads
+import { Worker } from "worker_threads";
+
+@Get("/heavy")
+async heavyComputation() {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker("./heavy-worker.js");
+    
+    worker.on("message", resolve);
+    worker.on("error", reject);
+    worker.on("exit", (code) => {
+      if (code !== 0) {
+        reject(new Error(`Worker stopped with exit code ${code}`));
+      }
+    });
+  });
+}
+
+// heavy-worker.js
+const { parentPort } = require("worker_threads");
+
+let result = 0;
+for (let i = 0; i < 10000000000; i++) {
+  result += i;
+}
+
+parentPort.postMessage({ result });
+```
+
+## Benchmarking 📊
+
+Use ferramentas para medir desempenho:
+
+```bash
+# Autocannon (Node.js)
+npm install -g autocannon
+autocannon -c 100 -d 10 http://localhost:3000/api/users
+
+# Apache Bench
+ab -n 10000 -c 100 http://localhost:3000/api/users
+
+# wrk
+wrk -t12 -c400 -d30s http://localhost:3000/api/users
+```
+
+### Exemplo de Benchmark
+
+```typescript
+import autocannon from "autocannon";
+
+async function benchmark() {
+  const result = await autocannon({
+    url: "http://localhost:3000",
+    connections: 100,
+    duration: 10,
+    pipelining: 1,
+    requests: [
+      {
+        method: "GET",
+        path: "/api/users"
+      }
+    ]
+  });
+  
+  console.log(`Requests/sec: ${result.requests.mean}`);
+  console.log(`Latency (avg): ${result.latency.mean}ms`);
+  console.log(`Throughput: ${result.throughput.mean} bytes/sec`);
+}
+
+benchmark();
+```
+
+## Monitoramento 📈
+
+```typescript
+import { performance } from "perf_hooks";
+
+function performanceMiddleware(req: RequestServer, res: ResponseServer, next: () => void) {
+  const start = performance.now();
+  
+  res.on("finish", () => {
+    const duration = performance.now() - start;
+    
+    console.log({
+      method: req.method,
+      url: req.url,
+      statusCode: res.statusCode,
+      duration: `${duration.toFixed(2)}ms`
+    });
+    
+    // Alertar se requisição demorar muito
+    if (duration > 1000) {
+      console.warn(`⚠️ Slow request: ${req.method} ${req.url} took ${duration.toFixed(2)}ms`);
+    }
+  });
+  
+  next();
+}
+
+app.use(performanceMiddleware);
+```
+
+## Otimizações de Produção 🚀
+
+### Variáveis de Ambiente
+
+```typescript
+const app = new AzuraClient({
+  environment: "production",
+  logging: {
+    level: process.env.NODE_ENV === "production" ? "error" : "debug"
+  }
+});
+```
+
+### PM2 Configuration
+
+```javascript
+// ecosystem.config.js
+module.exports = {
+  apps: [{
+    name: "azura-app",
+    script: "./dist/server.js",
+    instances: "max",  // Usar todos os cores
+    exec_mode: "cluster",
+    env_production: {
+      NODE_ENV: "production",
+      PORT: 3000
+    },
+    max_memory_restart: "500M",
+    error_file: "./logs/error.log",
+    out_file: "./logs/out.log",
+    log_date_format: "YYYY-MM-DD HH:mm:ss Z"
+  }]
+};
+```
+
+## Checklist de Performance ✅
+
+<Callout type="tip">
+  ✅ **Usar cluster mode** para utilizar todos os cores da CPU
+</Callout>
+
+<Callout type="tip">
+  ✅ **Implementar caching** para dados que não mudam frequentemente
+</Callout>
+
+<Callout type="tip">
+  ✅ **Otimizar queries de banco** com índices e JOINs adequados
+</Callout>
+
+<Callout type="tip">
+  ✅ **Usar connection pooling** para banco de dados
+</Callout>
+
+<Callout type="tip">
+  ✅ **Comprimir respostas** com gzip
+</Callout>
+
+<Callout type="tip">
+  ✅ **Paginar resultados** para limitar dados transferidos
+</Callout>
+
+<Callout type="tip">
+  ✅ **Usar Promise.all** para operações paralelas
+</Callout>
+
+<Callout type="tip">
+  ✅ **Monitorar desempenho** com métricas e logs
+</Callout>
+
+<Callout type="warn">
+  ⚠️ **Evitar bloqueio da event loop** com operações síncronas pesadas
+</Callout>
+
+<Callout type="warn">
+  ⚠️ **Não fazer queries N+1** - sempre usar JOINs ou batch queries
+</Callout>
+
+## Comparação de Performance 📊
+
+**Servidor único vs Cluster (8 cores):**
+
+```
+Single Process:
+  Requests/sec: 5,000
+  Latency: 20ms
+
+Cluster Mode (8 cores):
+  Requests/sec: 35,000
+  Latency: 3ms
+  
+Ganho: 7x throughput, 6.6x latência
+```
+
+## Próximos Passos 📖
+
+<Cards>
+  <Card title="Cluster Mode" href="cluster-mode" description="Configure cluster mode" />
+  <Card title="Exemplos" href="examples" description="Veja implementações completas" />
+  <Card title="Error Handling" href="error-handling" description="Trate erros eficientemente" />
+</Cards>

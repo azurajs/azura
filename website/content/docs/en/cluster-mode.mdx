@@ -1,0 +1,284 @@
+---
+title: Cluster Mode
+description: Scale your application across multiple CPU cores
+icon: Monitor
+---
+
+# Cluster Mode 🖥️
+
+Take advantage of multi-core systems by running your application in cluster mode.
+
+## Enable Cluster Mode ⚡
+
+Enable in configuration:
+
+```typescript title="azura.config.ts"
+const config: ConfigTypes = {
+  server: {
+    port: 3000,
+    cluster: true,  // Enable cluster mode
+  },
+};
+```
+
+When enabled, AzuraJS automatically:
+- Spawns one worker process per CPU core
+- Distributes incoming connections across workers
+- Restarts crashed workers automatically
+
+## How It Works 🔧
+
+```typescript
+import { AzuraClient } from "azurajs";
+
+const app = new AzuraClient();
+// If cluster is enabled in config:
+// - Master process forks workers
+// - Each worker runs the server
+// - Load is distributed automatically
+```
+
+Behind the scenes:
+
+```typescript
+if (cluster.isPrimary) {
+  for (let i = 0; i < os.cpus().length; i++) {
+    cluster.fork();
+  }
+  cluster.on("exit", () => cluster.fork());
+} else {
+  // Worker process runs server
+  app.listen(port);
+}
+```
+
+## When to Use Cluster Mode 📊
+
+**Use cluster mode when:**
+- ✅ Running in production
+- ✅ Handling high traffic
+- ✅ CPU-intensive operations
+- ✅ Multi-core server available
+
+**Don't use cluster mode when:**
+- ❌ Developing locally
+- ❌ Running on single-core systems
+- ❌ Using Docker with orchestration
+- ❌ Debugging issues
+
+## Development vs Production 🌍
+
+Conditional cluster mode:
+
+```typescript
+const isDev = process.env.NODE_ENV !== "production";
+
+const config: ConfigTypes = {
+  server: {
+    cluster: !isDev,  // Only in production
+  },
+};
+```
+
+## Monitoring Workers 👀
+
+View worker information:
+
+```typescript
+import cluster from "node:cluster";
+import os from "node:os";
+
+if (cluster.isPrimary) {
+  console.log(`Master process: ${process.pid}`);
+  console.log(`CPU cores: ${os.cpus().length}`);
+  
+  cluster.on("online", (worker) => {
+    console.log(`Worker ${worker.id} (${worker.process.pid}) is online`);
+  });
+  
+  cluster.on("exit", (worker, code, signal) => {
+    console.log(`Worker ${worker.id} died (${code || signal})`);
+    console.log("Starting new worker...");
+    cluster.fork();
+  });
+}
+```
+
+## Shared State Considerations 💾
+
+Workers don't share memory. Use external storage for shared state:
+
+### ❌ Won't Work Across Workers
+
+```typescript
+// In-memory cache won't be shared
+const cache = new Map();
+
+@Get("/data")
+getData() {
+  if (cache.has("key")) {
+    return cache.get("key");
+  }
+  // ...
+}
+```
+
+### ✅ Use External Storage
+
+```typescript
+// Redis for shared cache
+import Redis from "ioredis";
+const redis = new Redis();
+
+@Get("/data")
+async getData() {
+  const cached = await redis.get("key");
+  if (cached) {
+    return JSON.parse(cached);
+  }
+  // ...
+}
+```
+
+## Graceful Shutdown 🛑
+
+Handle worker shutdown gracefully:
+
+```typescript
+if (!cluster.isPrimary) {
+  process.on("SIGTERM", async () => {
+    console.log("Worker shutting down gracefully...");
+    
+    // Close server
+    server.close(() => {
+      console.log("Server closed");
+      process.exit(0);
+    });
+    
+    // Force exit after 30s
+    setTimeout(() => {
+      console.error("Forcing shutdown");
+      process.exit(1);
+    }, 30000);
+  });
+}
+```
+
+## Load Balancing ⚖️
+
+Cluster mode uses round-robin load balancing by default:
+
+```typescript
+import cluster from "node:cluster";
+
+if (cluster.isPrimary) {
+  cluster.schedulingPolicy = cluster.SCHED_RR;  // Round-robin (default)
+  // or
+  cluster.schedulingPolicy = cluster.SCHED_NONE;  // OS decides
+}
+```
+
+## Performance Gains 📈
+
+Expected performance improvement:
+
+- **2 cores**: ~1.8x throughput
+- **4 cores**: ~3.5x throughput
+- **8 cores**: ~6-7x throughput
+
+Actual gains depend on:
+- I/O vs CPU-bound operations
+- Operating system
+- Application architecture
+
+## Docker and Cluster Mode 🐳
+
+When using Docker with orchestration (Kubernetes, Docker Swarm):
+
+```typescript
+// Disable cluster mode in container
+const config: ConfigTypes = {
+  server: {
+    cluster: false,  // Let orchestrator handle scaling
+  },
+};
+```
+
+Instead, scale containers:
+
+```yaml
+# docker-compose.yml
+services:
+  api:
+    image: myapp
+    deploy:
+      replicas: 4  # Run 4 containers
+```
+
+## Worker Communication 📡
+
+Send messages between master and workers:
+
+```typescript
+import cluster from "node:cluster";
+
+if (cluster.isPrimary) {
+  // Send to all workers
+  for (const id in cluster.workers) {
+    cluster.workers[id]?.send({ type: "config-update" });
+  }
+} else {
+  // Receive in worker
+  process.on("message", (msg) => {
+    if (msg.type === "config-update") {
+      console.log("Config updated");
+    }
+  });
+}
+```
+
+## Best Practices ✨
+
+<Callout type="tip">
+  **Enable in production only** - Cluster mode adds complexity for debugging
+</Callout>
+
+<Callout type="tip">
+  **Use external storage** - Redis, databases for shared state
+</Callout>
+
+<Callout type="warn">
+  **Test thoroughly** - Behavior differs between single and cluster mode
+</Callout>
+
+<Callout type="info">
+  **Monitor workers** - Track worker health and restart patterns
+</Callout>
+
+## Troubleshooting 🔍
+
+### Workers Keep Crashing
+
+Check worker logs:
+
+```typescript
+cluster.on("exit", (worker, code, signal) => {
+  console.error(`Worker ${worker.id} crashed:`, { code, signal });
+});
+```
+
+### Inconsistent Behavior
+
+Ensure no shared in-memory state between workers.
+
+### Port Already in Use
+
+All workers share the same port - this is normal and expected.
+
+## Next Steps 📖
+
+<Cards>
+  <Card title="Performance" href="performance" description="Optimize your application" />
+  <Card title="Configuration" href="configuration" description="Advanced configuration options" />
+  <Card title="Error Handling" href="error-handling" description="Handle errors across workers" />
+</Cards>

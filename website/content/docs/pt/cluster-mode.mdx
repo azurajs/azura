@@ -1,0 +1,505 @@
+---
+title: Cluster Mode
+description: Utilize todos os núcleos da CPU com cluster mode
+icon: Monitor
+---
+
+# Cluster Mode 🖥️
+
+Cluster mode permite que sua aplicação AzuraJS utilize todos os núcleos da CPU, melhorando significativamente o desempenho e a capacidade de requisições.
+
+## Básico do Cluster Mode 💡
+
+O Node.js executa em uma única thread por padrão. Cluster mode cria múltiplos processos worker, cada um em seu próprio núcleo de CPU.
+
+```typescript
+import { AzuraClient } from "azurajs";
+import cluster from "cluster";
+import { cpus } from "os";
+
+const numCPUs = cpus().length;
+
+if (cluster.isPrimary) {
+  console.log(`Primary process ${process.pid} is running`);
+  
+  // Fork workers
+  for (let i = 0; i < numCPUs; i++) {
+    cluster.fork();
+  }
+  
+  cluster.on("exit", (worker, code, signal) => {
+    console.log(`Worker ${worker.process.pid} died`);
+    // Restart worker
+    cluster.fork();
+  });
+} else {
+  // Workers compartilham a porta TCP
+  const app = new AzuraClient();
+  
+  // Registrar controllers
+  applyDecorators(app, [UserController, PostController]);
+  
+  await app.listen(3000);
+  console.log(`Worker ${process.pid} started`);
+}
+```
+
+## Configuração Completa 🔧
+
+### Cluster com Configuração Avançada
+
+```typescript
+import cluster from "cluster";
+import { cpus } from "os";
+import { AzuraClient, applyDecorators } from "azurajs";
+import { UserController } from "./controllers/UserController";
+
+const numCPUs = cpus().length;
+const PORT = process.env.PORT || 3000;
+
+if (cluster.isPrimary) {
+  console.log(`🚀 Primary ${process.pid} is running`);
+  console.log(`📊 CPU cores: ${numCPUs}`);
+  
+  // Fork workers
+  for (let i = 0; i < numCPUs; i++) {
+    const worker = cluster.fork();
+    console.log(`🔷 Worker ${worker.process.pid} started`);
+  }
+  
+  // Monitorar workers
+  cluster.on("online", (worker) => {
+    console.log(`✅ Worker ${worker.process.pid} is online`);
+  });
+  
+  cluster.on("exit", (worker, code, signal) => {
+    console.log(`❌ Worker ${worker.process.pid} died (${signal || code})`);
+    
+    // Reiniciar worker
+    const newWorker = cluster.fork();
+    console.log(`🔄 New worker ${newWorker.process.pid} started`);
+  });
+  
+  // Graceful shutdown
+  process.on("SIGTERM", () => {
+    console.log("SIGTERM received, shutting down workers...");
+    
+    for (const id in cluster.workers) {
+      cluster.workers[id]?.kill();
+    }
+  });
+  
+} else {
+  // Worker process
+  const app = new AzuraClient({
+    environment: "production",
+    server: {
+      port: PORT
+    },
+    logging: {
+      level: "info"
+    }
+  });
+  
+  // Registrar controllers
+  applyDecorators(app, [UserController]);
+  
+  // Iniciar servidor
+  await app.listen(PORT);
+  console.log(`Worker ${process.pid} listening on port ${PORT}`);
+}
+```
+
+## Número Ideal de Workers 📊
+
+```typescript
+// Usar todos os núcleos
+const numCPUs = cpus().length;
+
+// Usar todos exceto um (deixar um core livre para o sistema)
+const numWorkers = Math.max(1, numCPUs - 1);
+
+// Usar metade dos núcleos (para ambientes compartilhados)
+const numWorkers = Math.max(1, Math.floor(numCPUs / 2));
+
+// Usar número configurável
+const numWorkers = process.env.WORKERS 
+  ? parseInt(process.env.WORKERS) 
+  : numCPUs;
+```
+
+## Comunicação entre Workers 💬
+
+Workers podem se comunicar através do processo primary:
+
+```typescript
+if (cluster.isPrimary) {
+  const stats = {
+    requests: 0,
+    errors: 0
+  };
+  
+  cluster.on("message", (worker, message) => {
+    if (message.type === "request") {
+      stats.requests++;
+    } else if (message.type === "error") {
+      stats.errors++;
+    }
+    
+    // Broadcast stats para todos os workers
+    for (const id in cluster.workers) {
+      cluster.workers[id]?.send({ type: "stats", data: stats });
+    }
+  });
+  
+} else {
+  // Worker
+  const app = new AzuraClient();
+  
+  app.use((req, res, next) => {
+    // Notificar primary sobre requisição
+    process.send?.({ type: "request" });
+    next();
+  });
+  
+  // Receber mensagens do primary
+  process.on("message", (message) => {
+    if (message.type === "stats") {
+      console.log("Global stats:", message.data);
+    }
+  });
+}
+```
+
+## Estado Compartilhado 🔄
+
+Workers não compartilham memória. Use Redis ou banco de dados para estado compartilhado:
+
+```typescript
+import { createClient } from "redis";
+
+const redis = createClient({ url: "redis://localhost:6379" });
+await redis.connect();
+
+@Controller("/api")
+export class ApiController {
+  @Get("/counter")
+  async getCounter() {
+    // Incrementar contador compartilhado
+    const count = await redis.incr("global-counter");
+    return { count, worker: process.pid };
+  }
+
+  @Post("/cache")
+  async setCache(@Body() data: any) {
+    // Cache compartilhado entre workers
+    await redis.setEx(`cache:${data.key}`, 3600, JSON.stringify(data.value));
+    return { cached: true };
+  }
+}
+```
+
+## Sessões em Cluster Mode 🔐
+
+Use Redis para armazenar sessões:
+
+```typescript
+import { createClient } from "redis";
+
+const redis = createClient();
+await redis.connect();
+
+// Middleware de sessão
+async function sessionMiddleware(
+  req: RequestServer,
+  res: ResponseServer,
+  next: () => void
+) {
+  const sessionId = req.cookies.sessionId;
+  
+  if (sessionId) {
+    const sessionData = await redis.get(`session:${sessionId}`);
+    if (sessionData) {
+      req.session = JSON.parse(sessionData);
+    }
+  }
+  
+  // Salvar sessão ao finalizar
+  const originalJson = res.json.bind(res);
+  res.json = async function(data: any) {
+    if (req.session) {
+      await redis.setEx(
+        `session:${sessionId}`,
+        3600,
+        JSON.stringify(req.session)
+      );
+    }
+    return originalJson(data);
+  };
+  
+  next();
+}
+
+app.use(sessionMiddleware);
+```
+
+## Monitoramento de Workers 📈
+
+### Middleware de Métricas
+
+```typescript
+if (cluster.isPrimary) {
+  const workerStats = new Map();
+  
+  // Coletar estatísticas
+  setInterval(() => {
+    for (const id in cluster.workers) {
+      const worker = cluster.workers[id];
+      worker?.send({ type: "request-stats" });
+    }
+  }, 10000);  // A cada 10 segundos
+  
+  cluster.on("message", (worker, message) => {
+    if (message.type === "stats") {
+      workerStats.set(worker.id, message.data);
+      
+      // Calcular estatísticas globais
+      let totalRequests = 0;
+      let totalErrors = 0;
+      
+      workerStats.forEach(stats => {
+        totalRequests += stats.requests;
+        totalErrors += stats.errors;
+      });
+      
+      console.log(`📊 Total: ${totalRequests} requests, ${totalErrors} errors`);
+    }
+  });
+  
+} else {
+  let workerRequests = 0;
+  let workerErrors = 0;
+  
+  app.use((req, res, next) => {
+    workerRequests++;
+    next();
+  });
+  
+  process.on("message", (message) => {
+    if (message.type === "request-stats") {
+      process.send?.({
+        type: "stats",
+        data: {
+          requests: workerRequests,
+          errors: workerErrors,
+          pid: process.pid
+        }
+      });
+    }
+  });
+}
+```
+
+## Graceful Shutdown 🛑
+
+Implemente shutdown gracioso para não perder requisições:
+
+```typescript
+if (cluster.isPrimary) {
+  process.on("SIGTERM", async () => {
+    console.log("Iniciando graceful shutdown...");
+    
+    // Notificar workers para parar de aceitar novas conexões
+    for (const id in cluster.workers) {
+      cluster.workers[id]?.send({ type: "shutdown" });
+    }
+    
+    // Aguardar workers finalizarem
+    await new Promise((resolve) => {
+      const timeout = setTimeout(resolve, 30000);  // Timeout de 30s
+      
+      let workersAlive = Object.keys(cluster.workers || {}).length;
+      
+      cluster.on("exit", () => {
+        workersAlive--;
+        if (workersAlive === 0) {
+          clearTimeout(timeout);
+          resolve(undefined);
+        }
+      });
+    });
+    
+    console.log("Shutdown completo");
+    process.exit(0);
+  });
+  
+} else {
+  let server: any;
+  
+  const app = new AzuraClient();
+  server = await app.listen(3000);
+  
+  process.on("message", (message) => {
+    if (message.type === "shutdown") {
+      console.log(`Worker ${process.pid} iniciando shutdown...`);
+      
+      // Parar de aceitar novas conexões
+      server.close(() => {
+        console.log(`Worker ${process.pid} encerrado`);
+        process.exit(0);
+      });
+      
+      // Forçar shutdown após 10 segundos
+      setTimeout(() => {
+        console.log(`Worker ${process.pid} forçando shutdown`);
+        process.exit(1);
+      }, 10000);
+    }
+  });
+}
+```
+
+## Zero-Downtime Deployments 🚀
+
+Reinicie workers um por vez para zero downtime:
+
+```typescript
+if (cluster.isPrimary) {
+  let workers: any[] = [];
+  
+  // Fork inicial
+  for (let i = 0; i < numCPUs; i++) {
+    workers.push(cluster.fork());
+  }
+  
+  // Reload gracioso
+  process.on("SIGUSR2", () => {
+    console.log("Iniciando reload gracioso...");
+    
+    const reloadWorker = (index: number) => {
+      if (index >= workers.length) {
+        console.log("Reload completo!");
+        return;
+      }
+      
+      const oldWorker = workers[index];
+      const newWorker = cluster.fork();
+      
+      newWorker.once("listening", () => {
+        // Matar worker antigo
+        oldWorker.kill();
+        workers[index] = newWorker;
+        
+        // Próximo worker após delay
+        setTimeout(() => reloadWorker(index + 1), 1000);
+      });
+    };
+    
+    reloadWorker(0);
+  });
+}
+```
+
+## Exemplo Completo 🎯
+
+```typescript
+// server.ts
+import cluster from "cluster";
+import { cpus } from "os";
+import { AzuraClient, applyDecorators } from "azurajs";
+import { createClient } from "redis";
+import { UserController } from "./controllers/UserController";
+
+const numCPUs = cpus().length;
+const PORT = 3000;
+
+if (cluster.isPrimary) {
+  console.log(`🚀 AzuraJS Cluster Mode`);
+  console.log(`📊 CPUs: ${numCPUs}`);
+  console.log(`🔷 Starting ${numCPUs} workers...`);
+  
+  // Fork workers
+  for (let i = 0; i < numCPUs; i++) {
+    cluster.fork();
+  }
+  
+  // Auto-restart
+  cluster.on("exit", (worker, code, signal) => {
+    console.log(`❌ Worker ${worker.process.pid} died`);
+    const newWorker = cluster.fork();
+    console.log(`✅ Worker ${newWorker.process.pid} started`);
+  });
+  
+  // Graceful shutdown
+  process.on("SIGTERM", () => {
+    for (const id in cluster.workers) {
+      cluster.workers[id]?.send({ type: "shutdown" });
+    }
+  });
+  
+} else {
+  // Worker
+  const redis = createClient();
+  await redis.connect();
+  
+  const app = new AzuraClient({
+    environment: "production",
+    server: { port: PORT },
+    plugins: {
+      cors: { enabled: true, origin: "*" },
+      rateLimit: { enabled: true, windowMs: 60000, max: 100 }
+    }
+  });
+  
+  // Middleware de sessão compartilhada
+  app.use(async (req, res, next) => {
+    const sessionId = req.cookies.sessionId;
+    if (sessionId) {
+      const data = await redis.get(`session:${sessionId}`);
+      req.session = data ? JSON.parse(data) : {};
+    }
+    next();
+  });
+  
+  // Registrar controllers
+  applyDecorators(app, [UserController]);
+  
+  // Iniciar servidor
+  const server = await app.listen(PORT);
+  console.log(`✅ Worker ${process.pid} listening on port ${PORT}`);
+  
+  // Graceful shutdown
+  process.on("message", (msg) => {
+    if (msg.type === "shutdown") {
+      server.close(() => process.exit(0));
+      setTimeout(() => process.exit(1), 10000);
+    }
+  });
+}
+```
+
+## Melhores Práticas ✨
+
+<Callout type="tip">
+  **Use Redis para estado compartilhado**: Workers não compartilham memória
+</Callout>
+
+<Callout type="tip">
+  **Implemente auto-restart**: Workers podem crashar, sempre reinicie automaticamente
+</Callout>
+
+<Callout type="tip">
+  **Graceful shutdown**: Aguarde requisições finalizarem antes de matar workers
+</Callout>
+
+<Callout type="warn">
+  **Cuidado com memória**: Cada worker consome memória, monitore uso total
+</Callout>
+
+## Próximos Passos 📖
+
+<Cards>
+  <Card title="Performance" href="performance" description="Otimize ainda mais" />
+  <Card title="Error Handling" href="error-handling" description="Trate erros em cluster" />
+  <Card title="Exemplos" href="examples" description="Veja exemplos completos" />
+</Cards>

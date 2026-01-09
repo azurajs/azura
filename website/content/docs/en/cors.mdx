@@ -1,0 +1,238 @@
+---
+title: CORS
+description: Configure Cross-Origin Resource Sharing
+icon: Globe
+---
+
+# CORS 🌐
+
+Configure CORS (Cross-Origin Resource Sharing) to allow or restrict cross-origin requests.
+
+## Built-in CORS Plugin 🔧
+
+Enable CORS in your configuration:
+
+```typescript title="azura.config.ts"
+import type { ConfigTypes } from "azurajs";
+
+const config: ConfigTypes = {
+  plugins: {
+    cors: {
+      enabled: true,
+      origins: ["https://example.com"],
+      methods: ["GET", "POST", "PUT", "DELETE"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+    },
+  },
+};
+
+export default config;
+```
+
+## Allow All Origins ⚠️
+
+For development only:
+
+```typescript
+cors: {
+  enabled: true,
+  origins: ["*"],  // ⚠️ Not recommended for production
+}
+```
+
+## Multiple Origins 🌍
+
+Allow specific domains:
+
+```typescript
+cors: {
+  enabled: true,
+  origins: [
+    "https://example.com",
+    "https://app.example.com",
+    "https://admin.example.com",
+  ],
+}
+```
+
+## Dynamic Origins 🔄
+
+Allow origins based on environment:
+
+```typescript
+const allowedOrigins = process.env.NODE_ENV === "production"
+  ? ["https://example.com"]
+  : ["http://localhost:3000", "http://localhost:5173"];
+
+const config: ConfigTypes = {
+  plugins: {
+    cors: {
+      enabled: true,
+      origins: allowedOrigins,
+    },
+  },
+};
+```
+
+## Custom CORS Middleware 🛠️
+
+Create custom CORS middleware for advanced control:
+
+```typescript
+import type { RequestHandler } from "azurajs";
+
+export function createCorsMiddleware(options: {
+  origins: string[];
+  credentials?: boolean;
+}): RequestHandler {
+  return async (req, res, next) => {
+    const origin = req.headers.origin;
+    
+    if (origin && options.origins.includes(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+    } else if (options.origins.includes("*")) {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    }
+    
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    
+    if (options.credentials) {
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    }
+    
+    // Handle preflight
+    if (req.method === "OPTIONS") {
+      res.status(204).end();
+      return;
+    }
+    
+    await next();
+  };
+}
+
+// Usage
+const app = new AzuraClient();
+app.use(createCorsMiddleware({
+  origins: ["https://example.com"],
+  credentials: true,
+}));
+```
+
+## Credentials Support 🔐
+
+Allow cookies and authentication:
+
+```typescript
+cors: {
+  enabled: true,
+  origins: ["https://example.com"],  // Must be specific, not "*"
+  credentials: true,  // Note: This requires custom middleware
+}
+
+// Custom middleware
+const corsMiddleware: RequestHandler = async (req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "https://example.com");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+  
+  await next();
+};
+
+app.use(corsMiddleware);
+```
+
+## Preflight Requests ✈️
+
+Handle OPTIONS requests for preflight:
+
+```typescript
+@Controller("/api/users")
+export class UserController {
+  @Options()
+  handlePreflight(@Res() res: ResponseServer) {
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Max-Age", "86400"); // Cache for 24 hours
+    res.status(204).end();
+  }
+}
+```
+
+## Route-Specific CORS 🎯
+
+Apply CORS only to specific routes:
+
+```typescript
+const publicCors: RequestHandler = async (req, res, next) => {
+  if (req.url?.startsWith("/api/public")) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  }
+  await next();
+};
+
+app.use(publicCors);
+```
+
+## Best Practices ✨
+
+<Callout type="warn">
+  **Never use "*" with credentials** - Browsers will block the request
+</Callout>
+
+<Callout type="tip">
+  **Be specific in production** - List exact domains instead of using wildcards
+</Callout>
+
+<Callout type="tip">
+  **Cache preflight requests** - Use `Access-Control-Max-Age` to reduce OPTIONS requests
+</Callout>
+
+<Callout type="info">
+  **Test CORS thoroughly** - Different browsers handle CORS slightly differently
+</Callout>
+
+## Troubleshooting 🔍
+
+### CORS Error: "No 'Access-Control-Allow-Origin' header"
+
+```typescript
+// Make sure CORS is enabled
+cors: {
+  enabled: true,
+  origins: ["https://your-frontend-domain.com"],
+}
+```
+
+### CORS Error with Credentials
+
+```typescript
+// Origin must be specific, not "*"
+cors: {
+  origins: ["https://example.com"],  // ✅ Specific
+  // origins: ["*"],  // ❌ Won't work with credentials
+}
+```
+
+### Preflight Request Fails
+
+```typescript
+// Ensure OPTIONS method is allowed
+cors: {
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],  // Include OPTIONS
+}
+```
+
+## Next Steps 📖
+
+<Cards>
+  <Card title="Configuration" href="configuration" description="Learn more about CORS configuration" />
+  <Card title="Middleware" href="middleware" description="Create custom CORS middleware" />
+  <Card title="Error Handling" href="error-handling" description="Handle CORS errors" />
+</Cards>

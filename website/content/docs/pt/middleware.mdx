@@ -1,0 +1,416 @@
+---
+title: Middleware
+description: Guia completo de middleware no AzuraJS
+icon: Plug
+---
+
+# Middleware 🔌
+
+Middleware permite interceptar e processar requisições antes de chegarem aos seus handlers de rota.
+
+## Conceito de Middleware 💡
+
+Middleware é uma função que tem acesso aos objetos request e response, e à função next no ciclo request-response.
+
+```typescript
+type RequestHandler = (
+  req: RequestServer,
+  res: ResponseServer,
+  next: (err?: unknown) => void
+) => void | Promise<void>;
+```
+
+## Middleware Global 🌐
+
+Registre middleware que executa para todas as rotas:
+
+```typescript
+import { AzuraClient } from "azurajs";
+
+const app = new AzuraClient();
+
+// Middleware de logging
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
+
+// Middleware de autenticação
+app.use((req, res, next) => {
+  const token = req.headers["authorization"];
+  if (!token) {
+    return res.status(401).json({ error: "Não autorizado" });
+  }
+  // Verificar token
+  next();
+});
+```
+
+## Middleware Incluído 📦
+
+### LoggingMiddleware
+
+Registra detalhes das requisições:
+
+```typescript
+import { AzuraClient, LoggingMiddleware } from "azurajs";
+
+const app = new AzuraClient();
+app.use(LoggingMiddleware);
+```
+
+## Middleware Customizado 🛠️
+
+### Middleware de Autenticação
+
+```typescript
+function authMiddleware(req: RequestServer, res: ResponseServer, next: () => void) {
+  const token = req.headers["authorization"]?.replace("Bearer ", "");
+  
+  if (!token) {
+    return res.status(401).json({ error: "Token não fornecido" });
+  }
+
+  try {
+    const decoded = verifyJWT(token);
+    req.user = decoded;  // Adicionar usuário ao request
+    next();
+  } catch (error) {
+    res.status(401).json({ error: "Token inválido" });
+  }
+}
+
+app.use(authMiddleware);
+```
+
+### Middleware de Validação
+
+```typescript
+function validateJSON(req: RequestServer, res: ResponseServer, next: () => void) {
+  if (req.method === "POST" || req.method === "PUT") {
+    const contentType = req.headers["content-type"];
+    
+    if (!contentType?.includes("application/json")) {
+      return res.status(415).json({ 
+        error: "Content-Type deve ser application/json" 
+      });
+    }
+  }
+  next();
+}
+
+app.use(validateJSON);
+```
+
+### Middleware de Rate Limiting
+
+```typescript
+const requestCounts = new Map<string, { count: number; resetAt: number }>();
+
+function rateLimitMiddleware(req: RequestServer, res: ResponseServer, next: () => void) {
+  const ip = req.ip;
+  const now = Date.now();
+  const windowMs = 60000; // 1 minuto
+  const maxRequests = 100;
+
+  let record = requestCounts.get(ip);
+
+  if (!record || now > record.resetAt) {
+    record = { count: 1, resetAt: now + windowMs };
+    requestCounts.set(ip, record);
+    return next();
+  }
+
+  record.count++;
+
+  if (record.count > maxRequests) {
+    return res.status(429).json({ 
+      error: "Muitas requisições. Tente novamente mais tarde." 
+    });
+  }
+
+  next();
+}
+
+app.use(rateLimitMiddleware);
+```
+
+### Middleware de CORS
+
+```typescript
+function corsMiddleware(req: RequestServer, res: ResponseServer, next: () => void) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  // Lidar com preflight
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+
+  next();
+}
+
+app.use(corsMiddleware);
+```
+
+### Middleware de Compression
+
+```typescript
+import { gzipSync } from "zlib";
+
+function compressionMiddleware(req: RequestServer, res: ResponseServer, next: () => void) {
+  const acceptEncoding = req.headers["accept-encoding"] || "";
+
+  if (acceptEncoding.includes("gzip")) {
+    const originalSend = res.send.bind(res);
+    
+    res.send = function(data: any) {
+      if (typeof data === "string" || Buffer.isBuffer(data)) {
+        const compressed = gzipSync(data);
+        res.setHeader("Content-Encoding", "gzip");
+        return originalSend(compressed);
+      }
+      return originalSend(data);
+    };
+  }
+
+  next();
+}
+
+app.use(compressionMiddleware);
+```
+
+### Middleware de Timeout
+
+```typescript
+function timeoutMiddleware(ms: number) {
+  return (req: RequestServer, res: ResponseServer, next: () => void) => {
+    const timeout = setTimeout(() => {
+      if (!res.headersSent) {
+        res.status(408).json({ error: "Request timeout" });
+      }
+    }, ms);
+
+    res.on("finish", () => clearTimeout(timeout));
+    next();
+  };
+}
+
+app.use(timeoutMiddleware(5000));  // Timeout de 5 segundos
+```
+
+## Middleware Async 🔄
+
+Middleware pode ser assíncrono:
+
+```typescript
+async function databaseMiddleware(
+  req: RequestServer,
+  res: ResponseServer,
+  next: () => void
+) {
+  try {
+    req.db = await getDatabaseConnection();
+    next();
+  } catch (error) {
+    res.status(500).json({ error: "Erro de banco de dados" });
+  }
+}
+
+app.use(databaseMiddleware);
+```
+
+## Tratamento de Erros ⚠️
+
+### Middleware de Erro Global
+
+```typescript
+function errorHandler(
+  error: any,
+  req: RequestServer,
+  res: ResponseServer,
+  next: () => void
+) {
+  console.error("Error:", error);
+
+  if (error instanceof HttpError) {
+    return res.status(error.statusCode).json({
+      error: error.message,
+      statusCode: error.statusCode
+    });
+  }
+
+  res.status(500).json({ 
+    error: "Erro interno do servidor" 
+  });
+}
+
+// Registrar por último
+app.use(errorHandler);
+```
+
+## Ordem de Middleware ⚡
+
+Middleware executa na ordem em que é registrado:
+
+```typescript
+const app = new AzuraClient();
+
+// 1. Logging (primeiro)
+app.use(LoggingMiddleware);
+
+// 2. CORS
+app.use(corsMiddleware);
+
+// 3. Rate limiting
+app.use(rateLimitMiddleware);
+
+// 4. Autenticação
+app.use(authMiddleware);
+
+// 5. Rotas
+applyDecorators(app, [UserController]);
+
+// 6. Error handler (último)
+app.use(errorHandler);
+```
+
+## Middleware Condicional 🎯
+
+Execute middleware apenas para certas rotas:
+
+```typescript
+function authMiddleware(req: RequestServer, res: ResponseServer, next: () => void) {
+  // Pular autenticação para rotas públicas
+  if (req.url.startsWith("/api/public")) {
+    return next();
+  }
+
+  const token = req.headers["authorization"];
+  if (!token) {
+    return res.status(401).json({ error: "Não autorizado" });
+  }
+
+  next();
+}
+
+app.use(authMiddleware);
+```
+
+## Middleware de Rota 🛣️
+
+Aplique middleware a rotas específicas:
+
+```typescript
+// Middleware aplicado antes de controllers
+app.use("/api/admin", adminAuthMiddleware);
+app.use("/api/users", rateLimitMiddleware);
+
+// Depois registre controllers
+applyDecorators(app, [AdminController, UserController]);
+```
+
+## Exemplos Práticos 🎨
+
+### Middleware de Cache
+
+```typescript
+const cache = new Map<string, { data: any; expires: number }>();
+
+function cacheMiddleware(ttl: number) {
+  return (req: RequestServer, res: ResponseServer, next: () => void) => {
+    if (req.method !== "GET") {
+      return next();
+    }
+
+    const key = req.url;
+    const cached = cache.get(key);
+
+    if (cached && Date.now() < cached.expires) {
+      return res.json(cached.data);
+    }
+
+    const originalJson = res.json.bind(res);
+    res.json = function(data: any) {
+      cache.set(key, { data, expires: Date.now() + ttl });
+      return originalJson(data);
+    };
+
+    next();
+  };
+}
+
+app.use(cacheMiddleware(60000));  // Cache de 1 minuto
+```
+
+### Middleware de Request ID
+
+```typescript
+import { randomUUID } from "crypto";
+
+function requestIdMiddleware(req: RequestServer, res: ResponseServer, next: () => void) {
+  const requestId = randomUUID();
+  req.id = requestId;
+  res.setHeader("X-Request-ID", requestId);
+  next();
+}
+
+app.use(requestIdMiddleware);
+```
+
+### Middleware de Sanitização
+
+```typescript
+function sanitizeMiddleware(req: RequestServer, res: ResponseServer, next: () => void) {
+  if (req.body) {
+    req.body = sanitizeObject(req.body);
+  }
+  next();
+}
+
+function sanitizeObject(obj: any): any {
+  if (typeof obj === "string") {
+    return obj.replace(/<script>/gi, "").trim();
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeObject);
+  }
+  if (typeof obj === "object" && obj !== null) {
+    const sanitized: any = {};
+    for (const key in obj) {
+      sanitized[key] = sanitizeObject(obj[key]);
+    }
+    return sanitized;
+  }
+  return obj;
+}
+
+app.use(sanitizeMiddleware);
+```
+
+## Melhores Práticas ✨
+
+<Callout type="tip">
+  **Sempre chame next()**: Sem chamar next(), a requisição fica pendurada
+</Callout>
+
+<Callout type="tip">
+  **Trate erros adequadamente**: Use try-catch em middleware async
+</Callout>
+
+<Callout type="tip">
+  **Mantenha middleware leve**: Evite operações pesadas que atrasam todas as requisições
+</Callout>
+
+<Callout type="warn">
+  **Ordem importa**: Registre middleware na ordem correta (logging → cors → auth → rotas → errors)
+</Callout>
+
+## Próximos Passos 📖
+
+<Cards>
+  <Card title="CORS" href="cors" description="Configure CORS com plugin embutido" />
+  <Card title="Rate Limiting" href="rate-limiting" description="Proteja sua API" />
+  <Card title="Error Handling" href="error-handling" description="Trate erros globalmente" />
+</Cards>

@@ -1,0 +1,509 @@
+---
+title: Decorators
+description: Guia completo de todos os decorators do AzuraJS
+icon: Tag
+---
+
+# Decorators 🏷️
+
+AzuraJS fornece um rico conjunto de decorators TypeScript para construir APIs elegantes e type-safe.
+
+## Decorators de Classe 🎯
+
+### @Controller
+
+Define uma classe controller com um caminho base opcional.
+
+```typescript
+@Controller(prefix?: string)
+```
+
+**Exemplos:**
+
+```typescript
+// Com prefixo
+@Controller("/api/users")
+export class UserController {}
+
+// Sem prefixo
+@Controller()
+export class RootController {}
+
+// Caminho aninhado
+@Controller("/api/v1/admin/users")
+export class AdminUserController {}
+```
+
+## Decorators de Método 🛣️
+
+Decorators de método definem rotas HTTP para métodos do controller.
+
+### @Get
+
+Define uma rota GET.
+
+```typescript
+@Get(path?: string)
+```
+
+**Exemplos:**
+
+```typescript
+@Controller("/api/users")
+export class UserController {
+  @Get()  // GET /api/users
+  getAll() {}
+
+  @Get("/:id")  // GET /api/users/:id
+  getOne() {}
+
+  @Get("/search")  // GET /api/users/search
+  search() {}
+}
+```
+
+### @Post
+
+Define uma rota POST.
+
+```typescript
+@Post(path?: string)
+```
+
+**Exemplo:**
+
+```typescript
+@Post()  // POST /api/users
+createUser(@Body() data: any) {
+  return { id: Date.now(), ...data };
+}
+```
+
+### @Put
+
+Define uma rota PUT para atualizações completas.
+
+```typescript
+@Put(path?: string)
+```
+
+**Exemplo:**
+
+```typescript
+@Put("/:id")  // PUT /api/users/:id
+updateUser(@Param("id") id: string, @Body() data: any) {
+  return { id, ...data };
+}
+```
+
+### @Patch
+
+Define uma rota PATCH para atualizações parciais.
+
+```typescript
+@Patch(path?: string)
+```
+
+**Exemplo:**
+
+```typescript
+@Patch("/:id")  // PATCH /api/users/:id
+patchUser(@Param("id") id: string, @Body() data: Partial<User>) {
+  return { id, ...data };
+}
+```
+
+### @Delete
+
+Define uma rota DELETE.
+
+```typescript
+@Delete(path?: string)
+```
+
+**Exemplo:**
+
+```typescript
+@Delete("/:id")  // DELETE /api/users/:id
+deleteUser(@Param("id") id: string) {
+  return { message: "Usuário deletado" };
+}
+```
+
+### @Head
+
+Define uma rota HEAD (para verificar existência de recurso).
+
+```typescript
+@Head(path?: string)
+```
+
+**Exemplo:**
+
+```typescript
+@Head("/:id")  // HEAD /api/users/:id
+checkExists(@Param("id") id: string, @Res() res: ResponseServer) {
+  const exists = users.some(u => u.id === id);
+  res.status(exists ? 200 : 404).end();
+}
+```
+
+### @Options
+
+Define uma rota OPTIONS (tipicamente para preflight CORS).
+
+```typescript
+@Options(path?: string)
+```
+
+**Exemplo:**
+
+```typescript
+@Options()  // OPTIONS /api/users
+handleOptions(@Res() res: ResponseServer) {
+  res.set("Allow", "GET, POST, PUT, DELETE").end();
+}
+```
+
+## Decorators de Parâmetro 🔖
+
+Decorators de parâmetro injetam dados nos parâmetros de métodos do controller.
+
+### @Req
+
+Injeta o objeto de requisição completo.
+
+```typescript
+@Req() req: RequestServer
+```
+
+**Exemplo:**
+
+```typescript
+@Get("/info")
+getInfo(@Req() req: RequestServer) {
+  return {
+    method: req.method,
+    url: req.url,
+    headers: req.headers
+  };
+}
+```
+
+### @Res
+
+Injeta o objeto de resposta para controle manual.
+
+```typescript
+@Res() res: ResponseServer
+```
+
+**Exemplo:**
+
+```typescript
+@Get("/download")
+download(@Res() res: ResponseServer) {
+  res.setHeader("Content-Type", "application/octet-stream");
+  res.setHeader("Content-Disposition", "attachment; filename=arquivo.zip");
+  res.send(fileBuffer);
+}
+```
+
+### @Body
+
+Extrai o corpo da requisição (automaticamente parseado para JSON e form data).
+
+```typescript
+@Body() body: any
+```
+
+**Exemplos:**
+
+```typescript
+// Corpo completo
+@Post()
+create(@Body() data: CreateUserDto) {
+  return { id: Date.now(), ...data };
+}
+
+// Acessar propriedades do corpo diretamente
+@Post()
+create(@Body() { name, email }: { name: string; email: string }) {
+  return { name, email };
+}
+```
+
+### @Param
+
+Extrai parâmetros de rota do caminho da URL.
+
+```typescript
+@Param(name?: string) param: string
+```
+
+**Exemplos:**
+
+```typescript
+// Parâmetro único
+@Get("/:id")
+getUser(@Param("id") id: string) {
+  return { id };
+}
+
+// Múltiplos parâmetros
+@Get("/:userId/posts/:postId")
+getPost(
+  @Param("userId") userId: string,
+  @Param("postId") postId: string
+) {
+  return { userId, postId };
+}
+
+// Todos os parâmetros
+@Get("/:userId/posts/:postId")
+getPost(@Param() params: Record<string, string>) {
+  return params;  // { userId: "1", postId: "2" }
+}
+```
+
+### @Query
+
+Extrai parâmetros de query string.
+
+```typescript
+@Query(name?: string) query: string
+```
+
+**Exemplos:**
+
+```typescript
+// Parâmetro de query único
+@Get("/search")
+search(@Query("q") searchTerm: string) {
+  return { results: [], query: searchTerm };
+}
+
+// Múltiplos parâmetros de query
+@Get("/filter")
+filter(
+  @Query("status") status: string,
+  @Query("limit") limit: string
+) {
+  return { status, limit };
+}
+
+// Todos os parâmetros de query
+@Get("/search")
+search(@Query() query: Record<string, string>) {
+  // GET /api/users/search?q=john&limit=10
+  return query;  // { q: "john", limit: "10" }
+}
+```
+
+### @Headers
+
+Extrai cabeçalhos da requisição.
+
+```typescript
+@Headers(name?: string) header: string | undefined
+```
+
+**Exemplos:**
+
+```typescript
+// Cabeçalho único
+@Get("/protected")
+getData(@Headers("authorization") auth: string) {
+  if (!auth) {
+    throw new HttpError(401, "Não autorizado");
+  }
+  return { data: "secreto" };
+}
+
+// Múltiplos cabeçalhos
+@Get("/info")
+getInfo(
+  @Headers("user-agent") ua: string,
+  @Headers("accept-language") lang: string
+) {
+  return { userAgent: ua, language: lang };
+}
+
+// Todos os cabeçalhos
+@Get("/headers")
+getAllHeaders(@Headers() headers: Record<string, string>) {
+  return { headers };
+}
+```
+
+### @Ip
+
+Extrai o endereço IP do cliente.
+
+```typescript
+@Ip() ip: string
+```
+
+**Exemplo:**
+
+```typescript
+@Post("/login")
+login(@Body() credentials: any, @Ip() ip: string) {
+  console.log(`Tentativa de login de ${ip}`);
+  // Autenticar usuário
+  return { success: true };
+}
+```
+
+### @UserAgent
+
+Extrai o cabeçalho User-Agent.
+
+```typescript
+@UserAgent() userAgent: string
+```
+
+**Exemplo:**
+
+```typescript
+@Get("/stats")
+trackVisit(@UserAgent() ua: string, @Ip() ip: string) {
+  console.log(`Visita de ${ip} usando ${ua}`);
+  return { message: "Visita registrada" };
+}
+```
+
+### @Next
+
+Injeta a função next para cadeias de middleware.
+
+```typescript
+@Next() next: (err?: unknown) => void
+```
+
+**Exemplo:**
+
+```typescript
+@Get("/async")
+async handleAsync(
+  @Req() req: RequestServer,
+  @Res() res: ResponseServer,
+  @Next() next: () => void
+) {
+  try {
+    const data = await fetchData();
+    res.json({ data });
+  } catch (error) {
+    next(error);
+  }
+}
+```
+
+## Combinando Decorators 🔗
+
+Você pode combinar múltiplos decorators de parâmetro em um método:
+
+```typescript
+@Controller("/api/posts")
+export class PostController {
+  @Get("/:id/comments")
+  getComments(
+    @Param("id") postId: string,
+    @Query("limit") limit: string,
+    @Query("offset") offset: string,
+    @Headers("authorization") auth: string,
+    @Ip() ip: string,
+    @Res() res: ResponseServer
+  ) {
+    // Verificar autenticação
+    if (!auth) {
+      return res.status(401).json({ error: "Não autorizado" });
+    }
+
+    // Registrar requisição
+    console.log(`${ip} solicitou comentários do post ${postId}`);
+
+    // Retornar comentários
+    const comments = getCommentsFromDB(postId, Number(limit), Number(offset));
+    res.json({ comments });
+  }
+
+  @Post("/:id/comments")
+  createComment(
+    @Param("id") postId: string,
+    @Body() data: CreateCommentDto,
+    @Ip() ip: string,
+    @UserAgent() ua: string,
+    @Res() res: ResponseServer
+  ) {
+    const comment = {
+      id: Date.now(),
+      postId,
+      ...data,
+      metadata: { ip, userAgent: ua }
+    };
+
+    res.status(201).json({ comment });
+  }
+}
+```
+
+## Ordem de Execução dos Decorators ⚡
+
+Decorators são executados nesta ordem:
+
+1. **Decorator de Classe** (`@Controller`) - Registra o controller
+2. **Decorators de Método** (`@Get`, `@Post`, etc.) - Registra rotas
+3. **Decorators de Parâmetro** (`@Body`, `@Param`, etc.) - Executados em runtime quando a rota é chamada
+
+## Segurança de Tipos com Decorators 🔒
+
+Use interfaces TypeScript para melhor segurança de tipos:
+
+```typescript
+interface CreatePostDto {
+  title: string;
+  content: string;
+  tags: string[];
+}
+
+interface UpdatePostDto {
+  title?: string;
+  content?: string;
+  tags?: string[];
+}
+
+@Controller("/api/posts")
+export class PostController {
+  @Post()
+  create(@Body() data: CreatePostDto, @Res() res: ResponseServer) {
+    // data é totalmente tipado
+    const post = {
+      id: Date.now(),
+      title: data.title,
+      content: data.content,
+      tags: data.tags
+    };
+    res.status(201).json({ post });
+  }
+
+  @Patch("/:id")
+  update(
+    @Param("id") id: string,
+    @Body() data: UpdatePostDto,
+    @Res() res: ResponseServer
+  ) {
+    // TypeScript sabe que todos os campos são opcionais
+    res.json({ id, ...data });
+  }
+}
+```
+
+## Próximos Passos 📖
+
+<Cards>
+  <Card title="Routing" href="routing" description="Aprenda sobre padrões avançados de rota" />
+  <Card title="Validação" href="validation" description="Valide parâmetros de decorators" />
+  <Card title="Middleware" href="middleware" description="Use middleware com decorators" />
+  <Card title="Exemplos" href="examples" description="Veja exemplos do mundo real" />
+</Cards>

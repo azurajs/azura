@@ -1,0 +1,27 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "---Getting Started---",
+    "installation",
+    "quick-start",
+    "configuration",
+    "---Core Concepts---",
+    "controllers",
+    "routing",
+    "decorators",
+    "middleware",
+    "---Features---",
+    "validation",
+    "cookies",
+    "cors",
+    "rate-limiting",
+    "cluster-mode",
+    "error-handling",
+    "---Advanced---",
+    "typescript-support",
+    "performance",
+    "---Examples---",
+    "examples"
+  ]
+}

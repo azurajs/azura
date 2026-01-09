@@ -1,0 +1,594 @@
+---
+title: TypeScript Support
+description: Aproveite o suporte completo ao TypeScript no AzuraJS
+icon: Box
+---
+
+# TypeScript Support 🔷
+
+AzuraJS é construído com TypeScript e fornece suporte de tipos de primeira classe para toda a API.
+
+## Decorators TypeScript 🏷️
+
+Habilite decorators no seu `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  }
+}
+```
+
+## Tipos Embutidos 📦
+
+AzuraJS exporta todos os tipos necessários:
+
+```typescript
+import type {
+  RequestServer,
+  ResponseServer,
+  ConfigTypes,
+  RequestHandler,
+  CORSOptions,
+  RateLimitOptions,
+  CookieOptions
+} from "azurajs";
+```
+
+## Tipagem de Request e Response 🔍
+
+### RequestServer
+
+```typescript
+interface RequestServer {
+  method: string;
+  url: string;
+  headers: Record<string, string | string[] | undefined>;
+  body?: any;
+  params: Record<string, string>;
+  query: Record<string, string>;
+  cookies: Record<string, string>;
+  ip: string;
+  // Propriedades customizadas
+  user?: any;
+  session?: any;
+}
+```
+
+**Exemplo:**
+
+```typescript
+@Get("/profile")
+getProfile(@Req() req: RequestServer) {
+  const userId: string = req.user?.id;
+  const ip: string = req.ip;
+  const userAgent: string | undefined = req.headers["user-agent"];
+  
+  return { userId, ip, userAgent };
+}
+```
+
+### ResponseServer
+
+```typescript
+interface ResponseServer {
+  status(code: number): ResponseServer;
+  json(data: any): void;
+  send(data: string | Buffer): void;
+  setHeader(name: string, value: string | string[]): void;
+  getHeader(name: string): string | string[] | undefined;
+  end(): void;
+  // ... outros métodos
+}
+```
+
+**Exemplo:**
+
+```typescript
+@Post("/users")
+createUser(@Body() data: any, @Res() res: ResponseServer) {
+  const user = saveUser(data);
+  
+  res
+    .status(201)
+    .setHeader("Location", `/users/${user.id}`)
+    .json({ user });
+}
+```
+
+## DTOs Tipados 📋
+
+Crie interfaces para seus Data Transfer Objects:
+
+```typescript
+// dtos/CreateUserDto.ts
+export interface CreateUserDto {
+  name: string;
+  email: string;
+  password: string;
+  age?: number;
+  role?: "user" | "admin";
+}
+
+export interface UpdateUserDto {
+  name?: string;
+  email?: string;
+  age?: number;
+}
+
+export interface UserResponse {
+  id: string;
+  name: string;
+  email: string;
+  age?: number;
+  role: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Usar no controller
+@Controller("/api/users")
+export class UserController {
+  @Post()
+  createUser(
+    @Body() data: CreateUserDto,
+    @Res() res: ResponseServer
+  ): void {
+    // data é totalmente tipado
+    const user: UserResponse = {
+      id: generateId(),
+      name: data.name,
+      email: data.email,
+      age: data.age,
+      role: data.role || "user",
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    res.status(201).json({ user });
+  }
+
+  @Patch("/:id")
+  updateUser(
+    @Param("id") id: string,
+    @Body() data: UpdateUserDto
+  ): UserResponse {
+    // TypeScript sabe que todos os campos são opcionais
+    const user = findUserById(id);
+    return { ...user, ...data, updatedAt: new Date() };
+  }
+}
+```
+
+## Integração com Zod 🔷
+
+Use Zod para validação e inferência de tipos:
+
+```typescript
+import { z } from "zod";
+
+// Definir schema
+const CreateUserSchema = z.object({
+  name: z.string().min(2).max(50),
+  email: z.string().email(),
+  password: z.string().min(8),
+  age: z.number().int().positive().optional(),
+  role: z.enum(["user", "admin", "moderator"]).default("user")
+});
+
+// Inferir tipo do schema
+type CreateUserDto = z.infer<typeof CreateUserSchema>;
+// Equivalente a:
+// interface CreateUserDto {
+//   name: string;
+//   email: string;
+//   password: string;
+//   age?: number;
+//   role: "user" | "admin" | "moderator";
+// }
+
+@Controller("/api/users")
+export class UserController {
+  @Post()
+  createUser(@Body() data: unknown, @Res() res: ResponseServer) {
+    // Validar e obter dados tipados
+    const validData: CreateUserDto = CreateUserSchema.parse(data);
+    
+    // validData é totalmente tipado
+    const user = {
+      id: generateId(),
+      ...validData,
+      createdAt: new Date()
+    };
+    
+    res.status(201).json({ user });
+  }
+}
+```
+
+## Type Guards 🛡️
+
+Crie type guards para verificação de tipos em runtime:
+
+```typescript
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface Admin extends User {
+  permissions: string[];
+  isSuperAdmin: boolean;
+}
+
+// Type guard
+function isAdmin(user: User | Admin): user is Admin {
+  return "permissions" in user && "isSuperAdmin" in user;
+}
+
+@Get("/dashboard")
+getDashboard(@Req() req: RequestServer) {
+  const user = req.user as User | Admin;
+  
+  if (isAdmin(user)) {
+    // TypeScript sabe que user é Admin aqui
+    return {
+      dashboard: "admin",
+      permissions: user.permissions,
+      isSuperAdmin: user.isSuperAdmin
+    };
+  }
+  
+  // TypeScript sabe que user é User aqui
+  return { dashboard: "user" };
+}
+```
+
+## Generics 🎯
+
+Use generics para funções reutilizáveis:
+
+```typescript
+// Resposta paginada genérica
+interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+function paginate<T>(
+  items: T[],
+  page: number,
+  pageSize: number
+): PaginatedResponse<T> {
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize;
+  
+  return {
+    data: items.slice(start, end),
+    total: items.length,
+    page,
+    pageSize,
+    totalPages: Math.ceil(items.length / pageSize)
+  };
+}
+
+@Get("/users")
+getUsers(@Query("page") page: string, @Query("pageSize") pageSize: string) {
+  const users: User[] = getAllUsers();
+  
+  // Tipo inferido: PaginatedResponse<User>
+  const response = paginate(users, Number(page), Number(pageSize));
+  
+  return response;
+}
+```
+
+## Utility Types 🛠️
+
+Use utility types do TypeScript:
+
+```typescript
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Omitir campos sensíveis
+type PublicUser = Omit<User, "password">;
+
+// Tornar campos opcionais
+type UpdateUserDto = Partial<Pick<User, "name" | "email">>;
+
+// Tornar campos obrigatórios
+type RequiredUser = Required<User>;
+
+// Apenas leitura
+type ReadonlyUser = Readonly<User>;
+
+@Get("/:id")
+getUser(@Param("id") id: string): PublicUser {
+  const user: User = findUserById(id);
+  
+  // Remover senha antes de retornar
+  const { password, ...publicUser } = user;
+  return publicUser;
+}
+```
+
+## Tipos de Middleware 🔌
+
+Tipagem completa para middleware:
+
+```typescript
+import type { RequestServer, ResponseServer, RequestHandler } from "azurajs";
+
+const authMiddleware: RequestHandler = (req, res, next) => {
+  const token = req.headers.authorization;
+  
+  if (!token) {
+    return res.status(401).json({ error: "Não autorizado" });
+  }
+  
+  try {
+    req.user = verifyToken(token);
+    next();
+  } catch (error) {
+    res.status(401).json({ error: "Token inválido" });
+  }
+};
+
+// Com tipos customizados no request
+interface AuthenticatedRequest extends RequestServer {
+  user: {
+    id: string;
+    email: string;
+    role: string;
+  };
+}
+
+const roleMiddleware = (allowedRoles: string[]): RequestHandler => {
+  return (req, res, next) => {
+    const authReq = req as AuthenticatedRequest;
+    
+    if (!authReq.user) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+    
+    if (!allowedRoles.includes(authReq.user.role)) {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+    
+    next();
+  };
+};
+```
+
+## Tipos de Configuração ⚙️
+
+Tipagem para configuração da aplicação:
+
+```typescript
+import type { ConfigTypes } from "azurajs";
+
+const config: ConfigTypes = {
+  environment: "production",
+  server: {
+    port: 3000,
+    host: "0.0.0.0"
+  },
+  logging: {
+    level: "info",
+    format: "json"
+  },
+  plugins: {
+    cors: {
+      enabled: true,
+      origin: ["https://example.com"],
+      credentials: true
+    },
+    rateLimit: {
+      enabled: true,
+      windowMs: 60000,
+      max: 100
+    }
+  }
+};
+
+const app = new AzuraClient(config);
+```
+
+## Decorators Tipados 🏷️
+
+Crie seus próprios decorators tipados:
+
+```typescript
+// Decorator de validação tipado
+function ValidateBody<T>(schema: z.ZodSchema<T>) {
+  return function (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor
+  ) {
+    const originalMethod = descriptor.value;
+    
+    descriptor.value = function (...args: any[]) {
+      const body = args.find((arg) => arg && typeof arg === "object");
+      
+      try {
+        const validData = schema.parse(body);
+        // Substituir body com dados validados
+        const index = args.indexOf(body);
+        args[index] = validData;
+      } catch (error) {
+        throw new HttpError(400, "Validação falhou");
+      }
+      
+      return originalMethod.apply(this, args);
+    };
+    
+    return descriptor;
+  };
+}
+
+// Usar decorator
+@Controller("/api/users")
+export class UserController {
+  @Post()
+  @ValidateBody(CreateUserSchema)
+  createUser(@Body() data: CreateUserDto) {
+    // data já está validado e tipado
+    return { user: data };
+  }
+}
+```
+
+## Type-Safe Repositories 💾
+
+Crie repositórios type-safe:
+
+```typescript
+interface Repository<T> {
+  findById(id: string): Promise<T | null>;
+  findAll(): Promise<T[]>;
+  create(data: Omit<T, "id" | "createdAt" | "updatedAt">): Promise<T>;
+  update(id: string, data: Partial<T>): Promise<T>;
+  delete(id: string): Promise<void>;
+}
+
+class UserRepository implements Repository<User> {
+  async findById(id: string): Promise<User | null> {
+    return await db.query("SELECT * FROM users WHERE id = $1", [id]);
+  }
+
+  async findAll(): Promise<User[]> {
+    return await db.query("SELECT * FROM users");
+  }
+
+  async create(data: Omit<User, "id" | "createdAt" | "updatedAt">): Promise<User> {
+    return await db.query(
+      "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *",
+      [data.name, data.email, data.password]
+    );
+  }
+
+  async update(id: string, data: Partial<User>): Promise<User> {
+    return await db.query(
+      "UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING *",
+      [data.name, data.email, id]
+    );
+  }
+
+  async delete(id: string): Promise<void> {
+    await db.query("DELETE FROM users WHERE id = $1", [id]);
+  }
+}
+
+@Controller("/api/users")
+export class UserController {
+  private userRepo = new UserRepository();
+
+  @Get("/:id")
+  async getUser(@Param("id") id: string) {
+    const user = await this.userRepo.findById(id);
+    
+    if (!user) {
+      throw new NotFoundError("Usuário");
+    }
+    
+    return { user };
+  }
+
+  @Post()
+  async createUser(@Body() data: CreateUserDto) {
+    const user = await this.userRepo.create(data);
+    return { user };
+  }
+}
+```
+
+## Enum Types 🎨
+
+Use enums para valores fixos:
+
+```typescript
+enum UserRole {
+  USER = "user",
+  ADMIN = "admin",
+  MODERATOR = "moderator"
+}
+
+enum PostStatus {
+  DRAFT = "draft",
+  PUBLISHED = "published",
+  ARCHIVED = "archived"
+}
+
+interface User {
+  id: string;
+  name: string;
+  role: UserRole;
+}
+
+interface Post {
+  id: string;
+  title: string;
+  status: PostStatus;
+}
+
+@Get("/users/:role")
+getUsersByRole(@Param("role") role: string) {
+  // Validar enum
+  if (!Object.values(UserRole).includes(role as UserRole)) {
+    throw new HttpError(400, "Role inválido");
+  }
+  
+  const users = findUsersByRole(role as UserRole);
+  return { users };
+}
+```
+
+## Melhores Práticas ✨
+
+<Callout type="tip">
+  **Sempre use tipos explícitos**: Evite `any`, use `unknown` se necessário
+</Callout>
+
+<Callout type="tip">
+  **Use Zod para runtime validation**: Combine validação runtime com type safety
+</Callout>
+
+<Callout type="tip">
+  **Crie DTOs para entrada e saída**: Separe tipos de domínio de tipos de API
+</Callout>
+
+<Callout type="tip">
+  **Use utility types**: Aproveite Partial, Pick, Omit, etc
+</Callout>
+
+<Callout type="warn">
+  **Valide tipos em runtime**: TypeScript não protege em runtime
+</Callout>
+
+## Próximos Passos 📖
+
+<Cards>
+  <Card title="Validação" href="validation" description="Valide dados com schemas" />
+  <Card title="Error Handling" href="error-handling" description="Trate erros type-safe" />
+  <Card title="Exemplos" href="examples" description="Veja exemplos completos" />
+</Cards>

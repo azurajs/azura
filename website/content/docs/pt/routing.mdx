@@ -1,0 +1,299 @@
+---
+title: Routing
+description: Aprenda sobre padrões de rota, parâmetros e correspondência
+icon: Route
+---
+
+# Routing 🛣️
+
+AzuraJS fornece um sistema de roteamento poderoso e flexível baseado em decorators e correspondência de padrões.
+
+## Básico de Rotas 📍
+
+Rotas são definidas usando decorators de método HTTP em métodos de controller.
+
+```typescript
+@Controller("/api/users")
+export class UserController {
+  @Get()  // Corresponde: GET /api/users
+  getAllUsers() {}
+
+  @Get("/:id")  // Corresponde: GET /api/users/123
+  getUser(@Param("id") id: string) {}
+}
+```
+
+## Caminhos de Rota 🗺️
+
+### Caminhos Estáticos
+
+```typescript
+@Get("/users")  // Correspondência exata apenas
+getUsers() {}
+
+@Get("/users/active")  // Correspondência exata
+getActiveUsers() {}
+```
+
+### Parâmetros Dinâmicos
+
+Use `:paramName` para parâmetros de rota:
+
+```typescript
+@Get("/:id")  // Corresponde /123, /abc, etc.
+getOne(@Param("id") id: string) {}
+
+@Get("/:userId/posts/:postId")  // Múltiplos parâmetros
+getPost(
+  @Param("userId") userId: string,
+  @Param("postId") postId: string
+) {}
+```
+
+### Parâmetros de Query
+
+Parâmetros de query não fazem parte do caminho da rota:
+
+```typescript
+// Rota: GET /search
+// URL: GET /search?q=john&limit=10
+@Get("/search")
+search(@Query("q") query: string, @Query("limit") limit: string) {
+  return { query, limit };
+}
+```
+
+## Padrões de Rota 🎨
+
+### Combinando Estático e Dinâmico
+
+```typescript
+@Controller("/api")
+export class ApiController {
+  @Get("/users/:id/profile")  // GET /api/users/123/profile
+  getProfile(@Param("id") id: string) {}
+
+  @Get("/posts/:id/comments/:commentId")  // Múltiplos params
+  getComment(
+    @Param("id") postId: string,
+    @Param("commentId") commentId: string
+  ) {}
+}
+```
+
+### Rotas Aninhadas
+
+```typescript
+@Controller("/api/organizations")
+export class OrgController {
+  @Get("/:orgId/teams/:teamId/members")
+  getMembers(
+    @Param("orgId") orgId: string,
+    @Param("teamId") teamId: string
+  ) {
+    return { orgId, teamId };
+  }
+}
+```
+
+## Prioridade de Rotas ⚡
+
+Rotas são correspondidas na ordem em que são registradas. Rotas mais específicas devem ser definidas primeiro:
+
+```typescript
+@Controller("/api/users")
+export class UserController {
+  // ✅ Ordem correta
+  @Get("/me")  // Rota específica primeiro
+  getCurrentUser() {}
+
+  @Get("/:id")  // Rota genérica depois
+  getUser(@Param("id") id: string) {}
+
+  // ❌ Ordem errada
+  @Get("/:id")  // Isso corresponderia /me
+  getUser2(@Param("id") id: string) {}
+
+  @Get("/me")  // Nunca alcançado!
+  getCurrentUser2() {}
+}
+```
+
+## Métodos HTTP 🔧
+
+Todos os métodos HTTP padrão são suportados:
+
+```typescript
+@Controller("/api/posts")
+export class PostController {
+  @Get()  // Ler todos
+  getAll() {}
+
+  @Get("/:id")  // Ler um
+  getOne(@Param("id") id: string) {}
+
+  @Post()  // Criar
+  create(@Body() data: any) {}
+
+  @Put("/:id")  // Atualizar (completo)
+  update(@Param("id") id: string, @Body() data: any) {}
+
+  @Patch("/:id")  // Atualizar (parcial)
+  patch(@Param("id") id: string, @Body() data: any) {}
+
+  @Delete("/:id")  // Deletar
+  remove(@Param("id") id: string) {}
+
+  @Head("/:id")  // Verificar existência
+  exists(@Param("id") id: string, @Res() res: ResponseServer) {
+    res.status(200).end();
+  }
+
+  @Options()  // Preflight CORS
+  options(@Res() res: ResponseServer) {
+    res.set("Allow", "GET, POST").end();
+  }
+}
+```
+
+## Rotas Programáticas 🔨
+
+Você também pode definir rotas programaticamente sem decorators:
+
+```typescript
+const app = new AzuraClient();
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.post("/api/webhook", (req, res) => {
+  console.log("Webhook recebido:", req.body);
+  res.status(200).send("OK");
+});
+
+app.put("/api/items/:id", (req, res) => {
+  res.json({ id: req.params.id });
+});
+```
+
+## Helpers de Rota 🛠️
+
+### Múltiplas Rotas por Método
+
+```typescript
+// Não suportado diretamente, mas você pode criar um wrapper
+@Controller("/api/posts")
+export class PostController {
+  private getPostsLogic() {
+    return { posts: [] };
+  }
+
+  @Get()
+  getPosts() {
+    return this.getPostsLogic();
+  }
+
+  @Get("/all")
+  getAllPosts() {
+    return this.getPostsLogic();
+  }
+}
+```
+
+### Grupos de Rotas
+
+Use controllers para agrupar rotas relacionadas:
+
+```typescript
+// Rotas de autenticação
+@Controller("/auth")
+export class AuthController {
+  @Post("/login")
+  login() {}
+
+  @Post("/register")
+  register() {}
+
+  @Post("/logout")
+  logout() {}
+}
+
+// Rotas de API pública
+@Controller("/api/public")
+export class PublicController {}
+
+// Rotas de admin
+@Controller("/api/admin")
+export class AdminController {}
+```
+
+## Roteamento RESTful 🎯
+
+Siga convenções REST para APIs baseadas em recursos:
+
+```typescript
+@Controller("/api/users")
+export class UserController {
+  @Get()  // GET /api/users - Listar todos os usuários
+  index() {}
+
+  @Post()  // POST /api/users - Criar usuário
+  store(@Body() data: any) {}
+
+  @Get("/:id")  // GET /api/users/:id - Obter um usuário
+  show(@Param("id") id: string) {}
+
+  @Put("/:id")  // PUT /api/users/:id - Atualizar usuário
+  update(@Param("id") id: string, @Body() data: any) {}
+
+  @Delete("/:id")  // DELETE /api/users/:id - Deletar usuário
+  destroy(@Param("id") id: string) {}
+}
+```
+
+## Testando Rotas 🧪
+
+Teste suas rotas:
+
+```typescript
+import { AzuraClient, applyDecorators } from "azurajs";
+import { UserController } from "./controllers/UserController";
+
+const app = new AzuraClient();
+applyDecorators(app, [UserController]);
+
+// Iniciar servidor
+await app.listen(3000);
+
+// Testar endpoints
+const response = await fetch("http://localhost:3000/api/users/123");
+const data = await response.json();
+console.log(data);
+```
+
+## Melhores Práticas ✨
+
+<Callout type="tip">
+  **Use nomes consistentes**: Siga convenções REST (index, show, store, update, destroy)
+</Callout>
+
+<Callout type="tip">
+  **Mantenha rotas planas**: Evite rotas profundamente aninhadas (máximo 2-3 níveis)
+</Callout>
+
+<Callout type="tip">
+  **Use substantivos no plural**: `/users` em vez de `/user`, `/posts` em vez de `/post`
+</Callout>
+
+<Callout type="warn">
+  **Observe a ordem das rotas**: Rotas específicas antes das genéricas
+</Callout>
+
+## Próximos Passos 📖
+
+<Cards>
+  <Card title="Decorators" href="decorators" description="Domine todos os decorators" />
+  <Card title="Middleware" href="middleware" description="Adicione middleware às rotas" />
+  <Card title="Validação" href="validation" description="Valide parâmetros de rota" />
+</Cards>

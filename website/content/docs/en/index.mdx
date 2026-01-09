@@ -1,0 +1,89 @@
+---
+title: Welcome to AzuraJS 
+description: A modern, fast, and TypeScript-first web framework for Node.js and Bun
+icon: Zap
+---
+
+# Welcome to AzuraJS ⚡
+
+**AzuraJS** is a modern, high-performance web framework for Node.js and Bun that brings the power of TypeScript decorators to backend development. Build elegant, type-safe APIs with a clean and intuitive syntax.
+
+## ✨ Why AzuraJS?
+
+<Cards>
+  <Card title="🎯 Decorator-Based" description="Express-style syntax enhanced with TypeScript decorators for clean, readable code" />
+  <Card title="🚀 High Performance" description="Built for speed with minimal overhead and zero external dependencies" />
+  <Card title="📦 Zero Dependencies" description="Lightweight and efficient - no bloated node_modules" />
+  <Card title="🔧 TypeScript First" description="Full type safety and IntelliSense support out of the box" />
+  <Card title="🔌 Middleware Support" description="Express-compatible middleware system for easy integration" />
+  <Card title="⚙️ Highly Configurable" description="File-based configuration with TypeScript, JSON, or YAML support" />
+</Cards>
+
+## 🎨 Key Features
+
+- **Parameter Injection** - `@Body`, `@Query`, `@Param`, `@Req`, `@Res`, and more
+- **Built-in Validation** - DTO and schema validation with full type safety
+- **Cookie Handling** - Built-in cookie parser and serializer
+- **CORS Support** - Configurable CORS plugin ready to use
+- **Rate Limiting** - Protect your API from abuse with built-in rate limiting
+- **Cluster Mode** - Multi-core support for production workloads
+- **Smart Logging** - Environment-aware request/response logging
+- **Error Handling** - Structured error handling with HttpError class
+
+## 🚀 Quick Example
+
+```typescript
+import { 
+  AzuraClient, 
+  Controller, 
+  Get, 
+  Post, 
+  Body, 
+  Param,
+  applyDecorators 
+} from "azurajs";
+
+@Controller("/api/users")
+class UserController {
+  @Get()
+  getAllUsers() {
+    return { users: ["Alice", "Bob"] };
+  }
+
+  @Get("/:id")
+  getUser(@Param("id") id: string) {
+    return { id, name: `User ${id}` };
+  }
+
+  @Post()
+  createUser(@Body() data: any) {
+    return { id: Date.now(), ...data };
+  }
+}
+
+const app = new AzuraClient();
+applyDecorators(app, [UserController]);
+await app.listen(3000);
+```
+
+## 📚 What's Next?
+
+<Cards>
+  <Card title="Installation" href="en/installation" description="Get started by installing AzuraJS in your project" />
+  <Card title="Quick Start" href="en/quick-start" description="Build your first API in minutes" />
+  <Card title="Configuration" href="en/configuration" description="Learn about all configuration options" />
+  <Card title="Controllers" href="en/controllers" description="Master the controller pattern" />
+</Cards>
+
+## 🌟 Community
+
+AzuraJS is open source and welcomes contributions! Join our community:
+
+- ⭐ [GitHub Repository](https://github.com/0xviny/azurajs)
+- 📦 [NPM Package](https://www.npmjs.com/package/azurajs)
+- 🐛 [Report Issues](https://github.com/0xviny/azurajs/issues)
+- 💬 [Discussions](https://github.com/0xviny/azurajs/discussions)
+
+---
+
+Ready to build something amazing? Let's get started! 🎉

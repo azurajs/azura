@@ -1,0 +1,439 @@
+---
+title: Validação
+description: Valide entrada de requisições com schemas e DTOs
+icon: CircleCheck
+---
+
+# Validação ✅
+
+AzuraJS fornece validação poderosa de dados de entrada usando schemas e DTOs.
+
+## Validação de Schema 📋
+
+Use `validateSchema` para validar objetos contra schemas customizados.
+
+```typescript
+import { validateSchema } from "azurajs";
+
+const userSchema = {
+  name: { type: "string", required: true, minLength: 2 },
+  email: { type: "string", required: true, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ },
+  age: { type: "number", required: false, min: 0, max: 120 }
+};
+
+const result = validateSchema(data, userSchema);
+if (!result.isValid) {
+  console.log(result.errors);
+}
+```
+
+### Opções de Schema
+
+```typescript
+interface SchemaField {
+  type: "string" | "number" | "boolean" | "array" | "object";
+  required?: boolean;
+  minLength?: number;  // Para strings
+  maxLength?: number;  // Para strings
+  pattern?: RegExp;    // Para strings
+  min?: number;        // Para numbers
+  max?: number;        // Para numbers
+  enum?: any[];        // Valores permitidos
+  custom?: (value: any) => boolean | string;  // Validador customizado
+}
+```
+
+### Exemplo Completo
+
+```typescript
+const postSchema = {
+  title: {
+    type: "string",
+    required: true,
+    minLength: 5,
+    maxLength: 100
+  },
+  content: {
+    type: "string",
+    required: true,
+    minLength: 10
+  },
+  status: {
+    type: "string",
+    required: false,
+    enum: ["draft", "published", "archived"]
+  },
+  tags: {
+    type: "array",
+    required: false
+  },
+  publishedAt: {
+    type: "string",
+    required: false,
+    custom: (value) => {
+      const date = new Date(value);
+      return !isNaN(date.getTime()) || "Data inválida";
+    }
+  }
+};
+
+@Post()
+createPost(@Body() data: any, @Res() res: ResponseServer) {
+  const validation = validateSchema(data, postSchema);
+  
+  if (!validation.isValid) {
+    return res.status(400).json({ errors: validation.errors });
+  }
+
+  // Dados são válidos, criar post
+  const post = createPost(data);
+  res.status(201).json({ post });
+}
+```
+
+## Validação de DTO 🎯
+
+### Criar DTOs
+
+DTOs (Data Transfer Objects) definem a estrutura dos dados:
+
+```typescript
+// dtos/CreateUserDto.ts
+export interface CreateUserDto {
+  name: string;
+  email: string;
+  password: string;
+  age?: number;
+}
+
+export const CreateUserSchema = {
+  name: { type: "string", required: true, minLength: 2 },
+  email: { 
+    type: "string", 
+    required: true,
+    pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  },
+  password: { type: "string", required: true, minLength: 8 },
+  age: { type: "number", required: false, min: 0, max: 120 }
+};
+```
+
+### Usar DTOs em Controllers
+
+```typescript
+import { CreateUserDto, CreateUserSchema } from "./dtos/CreateUserDto";
+
+@Controller("/api/users")
+export class UserController {
+  @Post()
+  create(@Body() data: CreateUserDto, @Res() res: ResponseServer) {
+    // Validar
+    const validation = validateSchema(data, CreateUserSchema);
+    if (!validation.isValid) {
+      return res.status(400).json({ errors: validation.errors });
+    }
+
+    // Criar usuário
+    const user = {
+      id: Date.now(),
+      name: data.name,
+      email: data.email,
+      age: data.age
+    };
+
+    res.status(201).json({ user });
+  }
+}
+```
+
+## Integração com Zod 🔷
+
+Use Zod para validação poderosa com inferência de tipos:
+
+```typescript
+import { z } from "zod";
+
+// Definir schema
+const CreateUserSchema = z.object({
+  name: z.string().min(2).max(50),
+  email: z.string().email(),
+  password: z.string().min(8).max(100),
+  age: z.number().int().positive().max(120).optional(),
+  role: z.enum(["user", "admin", "moderator"]).default("user")
+});
+
+// Inferir tipo
+type CreateUserDto = z.infer<typeof CreateUserSchema>;
+
+@Controller("/api/users")
+export class UserController {
+  @Post()
+  create(@Body() data: unknown, @Res() res: ResponseServer) {
+    try {
+      // Validar e parsear
+      const validData = CreateUserSchema.parse(data);
+      
+      // validData é totalmente tipado
+      const user = {
+        id: Date.now(),
+        ...validData
+      };
+
+      res.status(201).json({ user });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          errors: error.errors.map(e => ({
+            path: e.path.join("."),
+            message: e.message
+          }))
+        });
+      }
+      throw error;
+    }
+  }
+}
+```
+
+## Validadores Customizados 🛠️
+
+### Criar Validador Reutilizável
+
+```typescript
+function validateAndRespond<T>(
+  schema: z.ZodSchema<T>,
+  data: unknown,
+  res: ResponseServer
+): T | null {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ 
+        errors: error.errors.map(e => ({
+          field: e.path.join("."),
+          message: e.message
+        }))
+      });
+    }
+    return null;
+  }
+}
+
+@Post()
+createUser(@Body() data: unknown, @Res() res: ResponseServer) {
+  const validData = validateAndRespond(CreateUserSchema, data, res);
+  if (!validData) return;  // Já respondeu com erro
+
+  const user = createUser(validData);
+  res.status(201).json({ user });
+}
+```
+
+### Middleware de Validação
+
+```typescript
+function validateBody<T>(schema: z.ZodSchema<T>) {
+  return (req: RequestServer, res: ResponseServer, next: () => void) => {
+    try {
+      req.validatedBody = schema.parse(req.body);
+      next();
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
+      next(error);
+    }
+  };
+}
+
+// Usar como middleware
+app.post("/api/users", validateBody(CreateUserSchema), (req, res) => {
+  const data = req.validatedBody;  // Dados validados e tipados
+  const user = createUser(data);
+  res.status(201).json({ user });
+});
+```
+
+## Validação de Query Params 🔍
+
+```typescript
+const SearchQuerySchema = z.object({
+  q: z.string().min(1),
+  limit: z.string().transform(Number).pipe(z.number().int().positive().max(100)).default("10"),
+  offset: z.string().transform(Number).pipe(z.number().int().min(0)).default("0"),
+  sort: z.enum(["asc", "desc"]).default("asc")
+});
+
+@Get("/search")
+search(@Query() query: unknown, @Res() res: ResponseServer) {
+  try {
+    const params = SearchQuerySchema.parse(query);
+    
+    const results = searchUsers({
+      query: params.q,
+      limit: params.limit,
+      offset: params.offset,
+      sort: params.sort
+    });
+
+    res.json({ results });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ errors: error.errors });
+    }
+    throw error;
+  }
+}
+```
+
+## Validação de Params 🎯
+
+```typescript
+const IdParamSchema = z.object({
+  id: z.string().uuid()
+});
+
+@Get("/:id")
+getUser(@Param() params: unknown, @Res() res: ResponseServer) {
+  try {
+    const { id } = IdParamSchema.parse(params);
+    
+    const user = findUserById(id);
+    if (!user) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    res.json({ user });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "ID inválido" });
+    }
+    throw error;
+  }
+}
+```
+
+## Schemas Complexos 🔨
+
+### Validação Aninhada
+
+```typescript
+const AddressSchema = z.object({
+  street: z.string().min(1),
+  city: z.string().min(1),
+  state: z.string().length(2),
+  zipCode: z.string().regex(/^\d{5}(-\d{4})?$/)
+});
+
+const UserWithAddressSchema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+  address: AddressSchema
+});
+
+type UserWithAddress = z.infer<typeof UserWithAddressSchema>;
+```
+
+### Arrays e Objetos
+
+```typescript
+const CreatePostSchema = z.object({
+  title: z.string().min(5).max(100),
+  content: z.string().min(10),
+  tags: z.array(z.string()).min(1).max(5),
+  metadata: z.record(z.string(), z.any()).optional()
+});
+```
+
+### Validação Condicional
+
+```typescript
+const CreateAccountSchema = z.object({
+  type: z.enum(["personal", "business"]),
+  name: z.string(),
+  // Campos condicionais
+  taxId: z.string().optional(),
+  companyName: z.string().optional()
+}).refine(
+  (data) => {
+    if (data.type === "business") {
+      return !!data.taxId && !!data.companyName;
+    }
+    return true;
+  },
+  {
+    message: "Business accounts require taxId and companyName"
+  }
+);
+```
+
+## Transformação de Dados 🔄
+
+Zod pode transformar dados durante validação:
+
+```typescript
+const UserInputSchema = z.object({
+  email: z.string().email().transform(s => s.toLowerCase()),
+  name: z.string().transform(s => s.trim()),
+  age: z.string().transform(Number).pipe(z.number().int().positive()),
+  createdAt: z.string().transform(s => new Date(s))
+});
+
+const input = {
+  email: "USER@EXAMPLE.COM",
+  name: "  John Doe  ",
+  age: "25",
+  createdAt: "2024-01-01"
+};
+
+const result = UserInputSchema.parse(input);
+// {
+//   email: "user@example.com",
+//   name: "John Doe",
+//   age: 25,
+//   createdAt: Date object
+// }
+```
+
+## Mensagens de Erro Personalizadas 💬
+
+```typescript
+const CreateUserSchema = z.object({
+  email: z.string().email({ message: "Formato de email inválido" }),
+  password: z.string()
+    .min(8, { message: "Senha deve ter pelo menos 8 caracteres" })
+    .regex(/[A-Z]/, { message: "Senha deve conter pelo menos uma letra maiúscula" })
+    .regex(/[0-9]/, { message: "Senha deve conter pelo menos um número" }),
+  age: z.number({
+    required_error: "Idade é obrigatória",
+    invalid_type_error: "Idade deve ser um número"
+  }).int().positive().max(120, { message: "Idade deve ser menor que 120" })
+});
+```
+
+## Melhores Práticas ✨
+
+<Callout type="tip">
+  **Valide na entrada**: Sempre valide dados antes de processá-los
+</Callout>
+
+<Callout type="tip">
+  **Use Zod para schemas complexos**: Zod fornece inferência de tipos e validação poderosa
+</Callout>
+
+<Callout type="tip">
+  **Crie DTOs reutilizáveis**: Defina schemas uma vez, use em vários lugares
+</Callout>
+
+<Callout type="warn">
+  **Não confie em dados do cliente**: Sempre valide, mesmo se o frontend validou
+</Callout>
+
+## Próximos Passos 📖
+
+<Cards>
+  <Card title="Decorators" href="decorators" description="Use @Body, @Query, @Param" />
+  <Card title="Error Handling" href="error-handling" description="Trate erros de validação" />
+  <Card title="TypeScript" href="typescript-support" description="Type-safety total" />
+</Cards>

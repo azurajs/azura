@@ -1,0 +1,175 @@
+---
+title: Instalação
+description: Instale AzuraJS no seu projeto
+icon: Package
+---
+
+# Instalação 📦
+
+Comece com AzuraJS instalando-o no seu projeto Node.js ou Bun.
+
+## Pré-requisitos ✅
+
+Antes de instalar AzuraJS, certifique-se de ter:
+
+- **Node.js** 18+ ou **Bun** 1.0+
+- **TypeScript** 5.0+ (recomendado)
+- Um gerenciador de pacotes: npm, yarn, pnpm ou bun
+
+## Métodos de Instalação
+
+### Usando npm
+
+```bash
+npm install azurajs
+```
+
+### Usando Yarn
+
+```bash
+yarn add azurajs
+```
+
+### Usando pnpm
+
+```bash
+pnpm add azurajs
+```
+
+### Usando Bun
+
+```bash
+bun add azurajs
+```
+
+## Configuração TypeScript 🔧
+
+AzuraJS requer que decorators experimentais sejam habilitados. Atualize seu `tsconfig.json`:
+
+```json title="tsconfig.json"
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}
+```
+
+### Opções de Configuração Importantes
+
+<Callout type="info">
+  **experimentalDecorators**: Habilita suporte a decorators TypeScript (necessário para `@Controller`, `@Get`, etc.)
+</Callout>
+
+<Callout type="info">
+  **emitDecoratorMetadata**: Habilita reflexão de metadados (recomendado para recursos avançados)
+</Callout>
+
+## Configuração do Projeto 🏗️
+
+Crie uma nova estrutura de projeto:
+
+```bash
+mkdir meu-app-azura
+cd meu-app-azura
+npm init -y
+npm install azurajs
+```
+
+Crie os arquivos básicos:
+
+```
+meu-app-azura/
+├── src/
+│   ├── index.ts
+│   └── controllers/
+│       └── AppController.ts
+├── azura.config.ts
+├── tsconfig.json
+└── package.json
+```
+
+## Verificar Instalação ✔️
+
+Crie um arquivo de teste simples para verificar se tudo está funcionando:
+
+```typescript title="src/index.ts"
+import { AzuraClient } from "azurajs";
+
+const app = new AzuraClient();
+console.log("✅ AzuraJS instalado com sucesso!");
+```
+
+Execute:
+
+```bash
+# Com Node.js
+npx tsx src/index.ts
+
+# Com Bun
+bun run src/index.ts
+```
+
+Se você ver a mensagem de sucesso, está pronto para começar! 🎉
+
+## Dependências de Desenvolvimento (Opcional) 📚
+
+Para uma melhor experiência de desenvolvimento, considere instalar:
+
+```bash
+# TypeScript e definições de tipos
+npm install -D typescript @types/node
+
+# Servidor de desenvolvimento com hot reload
+npm install -D tsx nodemon
+
+# ou use o modo watch integrado do Bun
+bun --watch src/index.ts
+```
+
+## Próximos Passos 🚀
+
+Agora que AzuraJS está instalado, você está pronto para:
+
+<Cards>
+  <Card title="Início Rápido" href="quick-start" description="Construa sua primeira API" />
+  <Card title="Configuração" href="configuration" description="Configure sua aplicação" />
+  <Card title="Controllers" href="controllers" description="Aprenda sobre controllers" />
+</Cards>
+
+## Solução de Problemas 🔍
+
+### Erros de Decorator
+
+Se você receber erros sobre decorators não sendo reconhecidos:
+
+1. Certifique-se de que `experimentalDecorators` está habilitado no `tsconfig.json`
+2. Verifique se está usando TypeScript 5.0 ou superior
+3. Confirme que seu editor está usando a versão TypeScript do workspace
+
+### Erros de Importação
+
+Se você não consegue importar de `azurajs`:
+
+1. Verifique se o pacote está instalado: `npm list azurajs`
+2. Tente deletar `node_modules` e reinstalar
+3. Limpe o cache do TypeScript: `rm -rf .tsbuildinfo`
+
+### Erros de Tipo
+
+Para problemas relacionados a tipos:
+
+1. Certifique-se de que `@types/node` está instalado
+2. Defina `"moduleResolution": "bundler"` ou `"node16"` no tsconfig
+3. Habilite `esModuleInterop` e `skipLibCheck`
+
+---
+
+Precisa de ajuda? Confira nossas [Issues no GitHub](https://github.com/0xviny/azurajs/issues) ou inicie uma [Discussão](https://github.com/0xviny/azurajs/discussions)!

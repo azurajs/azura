@@ -1,0 +1,309 @@
+---
+title: Rate Limiting
+description: Protect your API from abuse
+icon: Shield
+---
+
+# Rate Limiting 🛡️
+
+Protect your API from abuse and DDoS attacks with rate limiting.
+
+## Built-in Rate Limiting 🔧
+
+Enable rate limiting in configuration:
+
+```typescript title="azura.config.ts"
+const config: ConfigTypes = {
+  plugins: {
+    rateLimit: {
+      enabled: true,
+      limit: 100,        // 100 requests
+      timeframe: 60000,  // per minute (in milliseconds)
+    },
+  },
+};
+```
+
+## How It Works ⚙️
+
+The rate limiter tracks requests by IP address:
+
+- Counts requests from each IP
+- Resets counter after timeframe expires
+- Returns `429 Too Many Requests` when limit exceeded
+
+## Custom Rate Limiting 🛠️
+
+Create custom rate limiting middleware:
+
+```typescript
+import type { RequestHandler } from "azurajs";
+
+interface RateLimitStore {
+  count: number;
+  resetTime: number;
+}
+
+const store = new Map<string, RateLimitStore>();
+
+export function createRateLimiter(
+  limit: number,
+  windowMs: number
+): RequestHandler {
+  return async (req, res, next) => {
+    const ip = req.socket.remoteAddress || "unknown";
+    const now = Date.now();
+    
+    let record = store.get(ip);
+    
+    if (!record || now > record.resetTime) {
+      // Create new record
+      record = {
+        count: 1,
+        resetTime: now + windowMs,
+      };
+      store.set(ip, record);
+      await next();
+      return;
+    }
+    
+    record.count++;
+    
+    if (record.count > limit) {
+      const retryAfter = Math.ceil((record.resetTime - now) / 1000);
+      res.setHeader("Retry-After", retryAfter.toString());
+      res.setHeader("X-RateLimit-Limit", limit.toString());
+      res.setHeader("X-RateLimit-Remaining", "0");
+      res.setHeader("X-RateLimit-Reset", record.resetTime.toString());
+      
+      res.status(429).json({
+        error: "Too many requests",
+        retryAfter,
+      });
+      return;
+    }
+    
+    // Add rate limit headers
+    res.setHeader("X-RateLimit-Limit", limit.toString());
+    res.setHeader("X-RateLimit-Remaining", (limit - record.count).toString());
+    res.setHeader("X-RateLimit-Reset", record.resetTime.toString());
+    
+    await next();
+  };
+}
+
+// Usage
+const app = new AzuraClient();
+app.use(createRateLimiter(100, 60000)); // 100 req/min
+```
+
+## Per-Route Rate Limiting 🎯
+
+Apply different limits to different routes:
+
+```typescript
+const strictLimiter = createRateLimiter(10, 60000);   // 10 req/min
+const normalLimiter = createRateLimiter(100, 60000);  // 100 req/min
+
+// Apply to specific routes
+app.post("/api/auth/login", strictLimiter, loginHandler);
+app.get("/api/posts", normalLimiter, getPostsHandler);
+```
+
+## User-Based Rate Limiting 👤
+
+Rate limit by user ID instead of IP:
+
+```typescript
+export function createUserRateLimiter(
+  limit: number,
+  windowMs: number
+): RequestHandler {
+  const store = new Map<string, RateLimitStore>();
+  
+  return async (req, res, next) => {
+    // Get user ID from token/session
+    const userId = (req as any).user?.id || req.socket.remoteAddress;
+    
+    if (!userId) {
+      await next();
+      return;
+    }
+    
+    const now = Date.now();
+    let record = store.get(userId);
+    
+    if (!record || now > record.resetTime) {
+      record = {
+        count: 1,
+        resetTime: now + windowMs,
+      };
+      store.set(userId, record);
+      await next();
+      return;
+    }
+    
+    record.count++;
+    
+    if (record.count > limit) {
+      res.status(429).json({ error: "Rate limit exceeded" });
+      return;
+    }
+    
+    await next();
+  };
+}
+```
+
+## Tiered Rate Limiting ⭐
+
+Different limits for different user tiers:
+
+```typescript
+interface User {
+  id: string;
+  tier: "free" | "pro" | "enterprise";
+}
+
+const rateLimits = {
+  free: { limit: 100, window: 3600000 },        // 100/hour
+  pro: { limit: 1000, window: 3600000 },        // 1000/hour
+  enterprise: { limit: 10000, window: 3600000 }, // 10000/hour
+};
+
+export const tieredRateLimiter: RequestHandler = async (req, res, next) => {
+  const user = (req as any).user as User | undefined;
+  
+  if (!user) {
+    // Default for anonymous users
+    return await createRateLimiter(50, 3600000)(req, res, next);
+  }
+  
+  const config = rateLimits[user.tier];
+  return await createRateLimiter(config.limit, config.window)(req, res, next);
+};
+```
+
+## Distributed Rate Limiting 🌐
+
+For multi-server deployments, use Redis:
+
+```bash
+bun add ioredis
+```
+
+```typescript
+import Redis from "ioredis";
+
+const redis = new Redis({
+  host: process.env.REDIS_HOST,
+  port: 6379,
+});
+
+export function createRedisRateLimiter(
+  limit: number,
+  windowSeconds: number
+): RequestHandler {
+  return async (req, res, next) => {
+    const ip = req.socket.remoteAddress || "unknown";
+    const key = `ratelimit:${ip}`;
+    
+    try {
+      const requests = await redis.incr(key);
+      
+      if (requests === 1) {
+        await redis.expire(key, windowSeconds);
+      }
+      
+      if (requests > limit) {
+        const ttl = await redis.ttl(key);
+        res.setHeader("Retry-After", ttl.toString());
+        res.status(429).json({ error: "Too many requests" });
+        return;
+      }
+      
+      res.setHeader("X-RateLimit-Limit", limit.toString());
+      res.setHeader("X-RateLimit-Remaining", (limit - requests).toString());
+      
+      await next();
+    } catch (error) {
+      // Fail open - don't block if Redis is down
+      console.error("Rate limiter error:", error);
+      await next();
+    }
+  };
+}
+```
+
+## Response Headers 📋
+
+Standard rate limit headers:
+
+```typescript
+res.setHeader("X-RateLimit-Limit", "100");         // Total allowed
+res.setHeader("X-RateLimit-Remaining", "95");       // Remaining requests
+res.setHeader("X-RateLimit-Reset", "1704067200");   // Unix timestamp
+res.setHeader("Retry-After", "60");                 // Seconds to wait
+```
+
+## Bypass Rate Limiting 🔓
+
+Allow certain IPs or users to bypass:
+
+```typescript
+const whitelist = new Set(["127.0.0.1", "::1"]);
+const apiKeys = new Set([process.env.ADMIN_API_KEY]);
+
+export function createRateLimiterWithBypass(
+  limit: number,
+  windowMs: number
+): RequestHandler {
+  const limiter = createRateLimiter(limit, windowMs);
+  
+  return async (req, res, next) => {
+    const ip = req.socket.remoteAddress || "";
+    const apiKey = req.headers["x-api-key"] as string;
+    
+    // Bypass for whitelisted IPs
+    if (whitelist.has(ip)) {
+      await next();
+      return;
+    }
+    
+    // Bypass for API keys
+    if (apiKey && apiKeys.has(apiKey)) {
+      await next();
+      return;
+    }
+    
+    // Apply rate limiting
+    await limiter(req, res, next);
+  };
+}
+```
+
+## Best Practices ✨
+
+<Callout type="tip">
+  **Start conservative** - Begin with stricter limits and relax based on usage
+</Callout>
+
+<Callout type="tip">
+  **Use appropriate windows** - Shorter windows for sensitive endpoints
+</Callout>
+
+<Callout type="warn">
+  **Consider legitimate spikes** - Don't set limits too low
+</Callout>
+
+<Callout type="info">
+  **Monitor and adjust** - Track 429 responses and adjust limits accordingly
+</Callout>
+
+## Next Steps 📖
+
+<Cards>
+  <Card title="Middleware" href="middleware" description="Learn more about middleware" />
+  <Card title="Error Handling" href="error-handling" description="Handle rate limit errors" />
+  <Card title="Performance" href="performance" description="Optimize your API" />
+</Cards>

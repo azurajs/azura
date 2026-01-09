@@ -1,0 +1,393 @@
+---
+title: Performance
+description: Optimize your AzuraJS application for maximum performance
+icon: Zap
+---
+
+# Performance ⚡
+
+Optimize your AzuraJS application for speed, efficiency, and scalability.
+
+## Built-in Optimizations 🚀
+
+AzuraJS is designed for performance:
+
+- ✅ **Zero dependencies** - No bloated node_modules
+- ✅ **Efficient routing** - Fast route matching algorithm
+- ✅ **Minimal overhead** - Direct Node.js HTTP server integration
+- ✅ **Cluster mode** - Multi-core CPU utilization
+- ✅ **Streaming support** - Handle large payloads efficiently
+
+## Cluster Mode 🖥️
+
+Enable cluster mode for production:
+
+```typescript title="azura.config.ts"
+const config: ConfigTypes = {
+  server: {
+    cluster: true,  // Utilize all CPU cores
+  },
+};
+```
+
+**Performance gain**: ~7x throughput on 8-core systems
+
+## Response Caching 💾
+
+Cache responses to reduce processing:
+
+```typescript
+const cache = new Map<string, { data: any; expires: number }>();
+
+function cacheMiddleware(ttl: number): RequestHandler {
+  return async (req, res, next) => {
+    const key = `${req.method}:${req.url}`;
+    const cached = cache.get(key);
+    
+    if (cached && Date.now() < cached.expires) {
+      res.setHeader("X-Cache", "HIT");
+      res.json(cached.data);
+      return;
+    }
+    
+    // Intercept res.json to cache response
+    const originalJson = res.json.bind(res);
+    res.json = (data: any) => {
+      cache.set(key, {
+        data,
+        expires: Date.now() + ttl,
+      });
+      res.setHeader("X-Cache", "MISS");
+      originalJson(data);
+    };
+    
+    await next();
+  };
+}
+
+// Usage
+app.use(cacheMiddleware(60000)); // Cache for 1 minute
+```
+
+## Database Query Optimization 🗄️
+
+### Connection Pooling
+
+```typescript
+import { Pool } from "pg";
+
+const pool = new Pool({
+  max: 20,  // Maximum connections
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
+// Reuse connections
+@Get("/users")
+async getUsers(@Res() res: ResponseServer) {
+  const client = await pool.connect();
+  try {
+    const result = await client.query("SELECT * FROM users");
+    res.json({ users: result.rows });
+  } finally {
+    client.release();
+  }
+}
+```
+
+### Query Optimization
+
+```typescript
+// ❌ Bad: N+1 queries
+for (const user of users) {
+  const posts = await db.query("SELECT * FROM posts WHERE user_id = $1", [user.id]);
+  user.posts = posts.rows;
+}
+
+// ✅ Good: Single query with JOIN
+const result = await db.query(`
+  SELECT u.*, json_agg(p.*) as posts
+  FROM users u
+  LEFT JOIN posts p ON p.user_id = u.id
+  GROUP BY u.id
+`);
+```
+
+### Indexing
+
+```sql
+-- Add indexes for frequently queried columns
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_posts_user_id ON posts(user_id);
+CREATE INDEX idx_posts_created_at ON posts(created_at DESC);
+```
+
+## Compression 📦
+
+Compress responses to reduce bandwidth:
+
+```bash
+bun add compression
+```
+
+```typescript
+import compression from "compression";
+
+// Note: Compression is an Express middleware
+// For pure Node.js, use zlib:
+
+import { createGzip } from "zlib";
+
+const compressionMiddleware: RequestHandler = async (req, res, next) => {
+  const acceptEncoding = req.headers["accept-encoding"] || "";
+  
+  if (!acceptEncoding.includes("gzip")) {
+    await next();
+    return;
+  }
+  
+  // Intercept response
+  const originalSend = res.send.bind(res);
+  const originalJson = res.json.bind(res);
+  
+  res.send = (body: any) => {
+    res.setHeader("Content-Encoding", "gzip");
+    const gzip = createGzip();
+    gzip.pipe(res);
+    gzip.end(body);
+  };
+  
+  res.json = (data: any) => {
+    const json = JSON.stringify(data);
+    res.send(json);
+  };
+  
+  await next();
+};
+```
+
+## Streaming Large Responses 🌊
+
+Stream large data instead of loading everything into memory:
+
+```typescript
+import { createReadStream } from "fs";
+
+@Get("/export")
+exportData(@Res() res: ResponseServer) {
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Content-Disposition", "attachment; filename=data.json");
+  
+  const stream = createReadStream("./large-file.json");
+  stream.pipe(res);
+}
+```
+
+## Async/Await Best Practices 🔄
+
+### Parallel Execution
+
+```typescript
+// ❌ Slow: Sequential
+const user = await getUser(id);
+const posts = await getPosts(id);
+const comments = await getComments(id);
+
+// ✅ Fast: Parallel
+const [user, posts, comments] = await Promise.all([
+  getUser(id),
+  getPosts(id),
+  getComments(id),
+]);
+```
+
+### Early Returns
+
+```typescript
+// ❌ Unnecessary await
+@Get("/:id")
+async getUser(@Param("id") id: string, @Res() res: ResponseServer) {
+  const user = await findUser(id);
+  if (!user) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json({ user });
+}
+
+// ✅ Early return without await
+@Get("/:id")
+async getUser(@Param("id") id: string, @Res() res: ResponseServer) {
+  const user = await findUser(id);
+  if (!user) {
+    return res.status(404).json({ error: "Not found" });
+  }
+  res.json({ user });
+}
+```
+
+## Memory Management 🧠
+
+### Avoid Memory Leaks
+
+```typescript
+// ❌ Memory leak: unbounded cache
+const cache = new Map();
+
+@Get("/data")
+getData(@Query("key") key: string, @Res() res: ResponseServer) {
+  cache.set(key, data);  // Never cleaned up!
+  res.json({ data });
+}
+
+// ✅ Fixed: LRU cache with max size
+class LRUCache<K, V> {
+  private cache = new Map<K, V>();
+  
+  constructor(private maxSize: number) {}
+  
+  set(key: K, value: V) {
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+    this.cache.set(key, value);
+  }
+  
+  get(key: K): V | undefined {
+    return this.cache.get(key);
+  }
+}
+
+const cache = new LRUCache(1000);  // Max 1000 entries
+```
+
+### Clean Up Resources
+
+```typescript
+@Post("/process")
+async processFile(@Body() data: any, @Res() res: ResponseServer) {
+  let tempFile: string | null = null;
+  
+  try {
+    tempFile = await saveTempFile(data);
+    const result = await processFile(tempFile);
+    res.json({ result });
+  } finally {
+    // Always clean up
+    if (tempFile) {
+      await fs.unlink(tempFile);
+    }
+  }
+}
+```
+
+## Benchmarking 📊
+
+Measure performance:
+
+```typescript
+function benchmark(name: string): RequestHandler {
+  return async (req, res, next) => {
+    const start = process.hrtime.bigint();
+    
+    await next();
+    
+    const end = process.hrtime.bigint();
+    const duration = Number(end - start) / 1_000_000; // Convert to ms
+    
+    console.log(`[${name}] ${req.method} ${req.url} - ${duration.toFixed(2)}ms`);
+    res.setHeader("X-Response-Time", `${duration.toFixed(2)}ms`);
+  };
+}
+
+app.use(benchmark("API"));
+```
+
+## Production Checklist ✅
+
+- [ ] Enable cluster mode
+- [ ] Implement caching strategy
+- [ ] Optimize database queries
+- [ ] Add response compression
+- [ ] Use connection pooling
+- [ ] Monitor memory usage
+- [ ] Set up request timeouts
+- [ ] Enable production logging
+- [ ] Remove console.log statements
+- [ ] Implement rate limiting
+- [ ] Use CDN for static assets
+- [ ] Enable HTTP/2 if possible
+
+## Performance Monitoring 📈
+
+```typescript
+import { performance } from "perf_hooks";
+
+class PerformanceMonitor {
+  private metrics = new Map<string, number[]>();
+  
+  track(name: string, duration: number) {
+    const existing = this.metrics.get(name) || [];
+    existing.push(duration);
+    
+    // Keep only last 100 measurements
+    if (existing.length > 100) {
+      existing.shift();
+    }
+    
+    this.metrics.set(name, existing);
+  }
+  
+  getStats(name: string) {
+    const durations = this.metrics.get(name) || [];
+    if (durations.length === 0) return null;
+    
+    const sorted = [...durations].sort((a, b) => a - b);
+    const avg = durations.reduce((a, b) => a + b, 0) / durations.length;
+    const p50 = sorted[Math.floor(sorted.length * 0.5)];
+    const p95 = sorted[Math.floor(sorted.length * 0.95)];
+    const p99 = sorted[Math.floor(sorted.length * 0.99)];
+    
+    return { avg, p50, p95, p99, count: durations.length };
+  }
+}
+
+const monitor = new PerformanceMonitor();
+
+@Get("/stats")
+getStats(@Res() res: ResponseServer) {
+  res.json({
+    endpoints: Array.from(monitor.metrics.keys()).map(name => ({
+      name,
+      stats: monitor.getStats(name),
+    })),
+  });
+}
+```
+
+## Best Practices ✨
+
+<Callout type="tip">
+  **Profile before optimizing** - Measure to find actual bottlenecks
+</Callout>
+
+<Callout type="tip">
+  **Cache aggressively** - But with proper invalidation strategy
+</Callout>
+
+<Callout type="warn">
+  **Watch memory usage** - Especially with caching and long-running processes
+</Callout>
+
+<Callout type="info">
+  **Test under load** - Use tools like `autocannon` or `wrk` for benchmarking
+</Callout>
+
+## Next Steps 📖
+
+<Cards>
+  <Card title="Cluster Mode" href="cluster-mode" description="Scale across multiple cores" />
+  <Card title="Rate Limiting" href="rate-limiting" description="Protect against abuse" />
+  <Card title="Examples" href="examples" description="See optimized examples" />
+</Cards>
