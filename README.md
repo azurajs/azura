@@ -1,6 +1,12 @@
-# AzuraJS
+<div align="center">
+  <a href="https://azura.js.org">
+    <img src="website/public/azurajs.png" width="500" height="auto" alt="azurajs"/>
+  </a>
+</div>
 
-⚡ Modern, fast, and TypeScript-first web framework for Node.js and Bun with decorator-based routing.
+<hr />
+
+⚡ Azura is Modern, fast, and TypeScript-first web framework for Node.js and Bun with decorator-based routing.
 
 [![NPM Version](https://img.shields.io/npm/v/azurajs)](https://www.npmjs.com/package/azurajs)
 [![License](https://img.shields.io/npm/l/azurajs)](https://github.com/0xviny/azurajs/blob/main/LICENSE)
