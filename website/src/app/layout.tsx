@@ -42,10 +42,7 @@ export const metadata: Metadata = {
     images: [
       {
         url: "https://azura.js.org/logo.png",
-        width: 256,
-        height: 256,
         alt: "AzuraJS Framework",
-        type: "image/png",
       },
     ],
   },
