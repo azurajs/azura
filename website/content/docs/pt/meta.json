@@ -17,6 +17,7 @@
     "cookies",
     "cors",
     "rate-limiting",
+    "proxy",
     "cluster-mode",
     "error-handling",
     "---Avançado---",

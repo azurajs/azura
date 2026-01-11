@@ -1,7 +1,6 @@
 {
   "name": "test",
   "module": "index.ts",
-  "type": "module",
   "private": true,
   "scripts": {
     "start": "bun run index.ts",

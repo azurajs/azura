@@ -35,7 +35,7 @@ getUser(@Param("id") id: string) {
 ```javascript
 const { HttpError } = require("azurajs/http-error");
 
-app.get("/:id", (req, res) => {
+app.get("/:id", ({ req, res }) => {
   const { id } = req.params;
   const user = findUserById(id);
   
@@ -145,7 +145,7 @@ function asyncHandler(fn: Function) {
 }
 
 // Usar como middleware
-app.get("/users", asyncHandler(async (req, res) => {
+app.get("/users", asyncHandler(async ({ req, res }) => {
   const users = await getUsersFromDB();
   res.json({ users });
 }));

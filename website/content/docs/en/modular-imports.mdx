@@ -150,11 +150,11 @@ const app = new AzuraClient();
 app.use(createLoggingMiddleware(app.getConfig()));
 
 // Routes
-app.get("/users", (req, res) => {
+app.get("/users", ({ req, res }) => {
   res.json({ users: [] });
 });
 
-app.get("/users/:id", (req, res) => {
+app.get("/users/:id", ({ req, res }) => {
   const { id } = req.params;
   if (id === "0") {
     throw new HttpError(404, "User not found");
@@ -162,7 +162,7 @@ app.get("/users/:id", (req, res) => {
   res.json({ id, name: "User" });
 });
 
-app.post("/users", (req, res) => {
+app.post("/users", ({ req, res }) => {
   res.status(201).json({ id: Date.now(), ...req.body });
 });
 

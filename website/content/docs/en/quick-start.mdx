@@ -208,7 +208,7 @@ const logger = createLoggingMiddleware(app.getConfig());
 app.use(logger);
 
 // GET /api/users - Get all users
-app.get("/api/users", (req, res) => {
+app.get("/api/users", ({ req, res }) => {
   res.json({ 
     success: true, 
     data: users 
@@ -216,7 +216,7 @@ app.get("/api/users", (req, res) => {
 });
 
 // GET /api/users/:id - Get user by ID
-app.get("/api/users/:id", (req, res) => {
+app.get("/api/users/:id", ({ req, res }) => {
   const { id } = req.params;
   const user = users.find(u => u.id === Number(id));
   
@@ -231,7 +231,7 @@ app.get("/api/users/:id", (req, res) => {
 });
 
 // POST /api/users - Create a new user
-app.post("/api/users", (req, res) => {
+app.post("/api/users", ({ req, res }) => {
   const body = req.body;
   const newUser = {
     id: users.length + 1,
@@ -248,7 +248,7 @@ app.post("/api/users", (req, res) => {
 });
 
 // PUT /api/users/:id - Update user
-app.put("/api/users/:id", (req, res) => {
+app.put("/api/users/:id", ({ req, res }) => {
   const { id } = req.params;
   const body = req.body;
   const user = users.find(u => u.id === Number(id));
@@ -267,7 +267,7 @@ app.put("/api/users/:id", (req, res) => {
 });
 
 // DELETE /api/users/:id - Delete user
-app.delete("/api/users/:id", (req, res) => {
+app.delete("/api/users/:id", ({ req, res }) => {
   const { id } = req.params;
   const index = users.findIndex(u => u.id === Number(id));
   
@@ -454,7 +454,7 @@ Now that you have a basic API running, explore more features:
 ## Pro Tips 💡
 
 <Callout type="tip">
-  **Hot Reload**: Use `tsx watch` or `bun --watch` for automatic server restart during development
+  **Reload**: Use `tsx watch` or `bun --watch` for automatic server restart during development
 </Callout>
 
 <Callout type="tip">

@@ -42,7 +42,7 @@ import { Body, Param, Query, Headers, Req, Res } from "azurajs/decorators";
 // Use a API funcional ao invés:
 const { AzuraClient } = require("azurajs");
 const app = new AzuraClient();
-app.get("/", (req, res) => { /* ... */ });
+app.get("/", ({ req, res }) => { /* ... */ });
 ```
 
 ## Middleware

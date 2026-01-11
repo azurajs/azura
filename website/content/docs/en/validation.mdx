@@ -296,7 +296,7 @@ const createUserSchema = z.object({
   email: z.string().email(),
 });
 
-app.post("/api/users", validateBody(createUserSchema), (req, res) => {
+app.post("/api/users", validateBody(createUserSchema), ({ req, res }) => {
   // req.body is validated
   res.json({ user: req.body });
 });

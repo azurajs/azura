@@ -187,7 +187,7 @@ const logger = createLoggingMiddleware(app.getConfig());
 app.use(logger);
 
 // Get all posts with pagination
-app.get("/api/posts", (req, res) => {
+app.get("/api/posts", ({ req, res }) => {
   const { limit = 10, offset = 0 } = req.query;
   const limitNum = Number(limit);
   const offsetNum = Number(offset);
@@ -205,7 +205,7 @@ app.get("/api/posts", (req, res) => {
 });
 
 // Get single post
-app.get("/api/posts/:id", (req, res) => {
+app.get("/api/posts/:id", ({ req, res }) => {
   const { id } = req.params;
   const post = posts.find((p) => p.id === Number(id));
   
@@ -217,7 +217,7 @@ app.get("/api/posts/:id", (req, res) => {
 });
 
 // Create post
-app.post("/api/posts", (req, res) => {
+app.post("/api/posts", ({ req, res }) => {
   const { title, content, author } = req.body;
   
   if (!title || !content || !author) {
@@ -237,7 +237,7 @@ app.post("/api/posts", (req, res) => {
 });
 
 // Update post
-app.put("/api/posts/:id", (req, res) => {
+app.put("/api/posts/:id", ({ req, res }) => {
   const { id } = req.params;
   const { title, content, author } = req.body;
   
@@ -255,7 +255,7 @@ app.put("/api/posts/:id", (req, res) => {
 });
 
 // Delete post
-app.delete("/api/posts/:id", (req, res) => {
+app.delete("/api/posts/:id", ({ req, res }) => {
   const { id } = req.params;
   const index = posts.findIndex((p) => p.id === Number(id));
   
@@ -268,7 +268,7 @@ app.delete("/api/posts/:id", (req, res) => {
 });
 
 // Search posts
-app.get("/api/posts/search", (req, res) => {
+app.get("/api/posts/search", ({ req, res }) => {
   const { q } = req.query;
   
   if (!q) {

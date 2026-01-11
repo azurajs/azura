@@ -78,7 +78,7 @@ const app = new AzuraClient();
 
 // Rota: GET /search
 // URL: GET /search?q=john&limit=10
-app.get("/search", (req, res) => {
+app.get("/search", ({ req, res }) => {
   const query = req.query.q;
   const limit = req.query.limit;
   
@@ -188,16 +188,16 @@ Você também pode definir rotas programaticamente sem decorators:
 ```typescript
 const app = new AzuraClient();
 
-app.get("/api/health", (req, res) => {
+app.get("/api/health", ({ req, res }) => {
   res.json({ status: "ok" });
 });
 
-app.post("/api/webhook", (req, res) => {
+app.post("/api/webhook", ({ req, res }) => {
   console.log("Webhook recebido:", req.body);
   res.status(200).send("OK");
 });
 
-app.put("/api/items/:id", (req, res) => {
+app.put("/api/items/:id", ({ req, res }) => {
   res.json({ id: req.params.id });
 });
 ```
@@ -252,6 +252,58 @@ export class PublicController {}
 @Controller("/api/admin")
 export class AdminController {}
 ```
+
+## Router com Prefix 🎯
+
+O AzuraJS permite criar routers modulares e montá-los com prefixos específicos, facilitando a organização de rotas em aplicações maiores.
+
+### Exemplo Básico
+
+```javascript
+const { AzuraClient, Router } = require('azurajs');
+
+// Criar routers modulares
+const aboutRouter = new Router();
+aboutRouter.add('GET', '/', ({ req, res }) => {
+  res.end('About Home');
+});
+aboutRouter.add('GET', '/team', ({ req, res }) => {
+  res.end('Our Team');
+});
+
+const apiRouter = new Router();
+apiRouter.add('GET', '/', ({ req, res }) => {
+  res.json({ message: 'API Home' });
+});
+apiRouter.add('GET', '/users', ({ req, res }) => {
+  res.json({ users: [] });
+});
+
+// Montar routers com prefixos
+const app = new AzuraClient();
+app.use('/about', aboutRouter);
+app.use('/api', apiRouter);
+
+app.listen(3000);
+```
+
+### Rotas Disponíveis
+
+- `GET /about` → "About Home"
+- `GET /about/team` → "Our Team"
+- `GET /api` → JSON com mensagem
+- `GET /api/users` → JSON com lista de usuários
+
+### Benefícios
+
+- **Modularidade**: Organize rotas relacionadas em módulos separados
+- **Reutilização**: Use o mesmo router em diferentes aplicações
+- **Manutenibilidade**: Facilita encontrar e modificar rotas específicas
+- **Escalabilidade**: Adicione novos módulos sem modificar o código existente
+
+### Exemplo Completo
+
+Veja o exemplo completo em [examples/servers/router/prefix.js](https://github.com/azurajsjs/azurajs/tree/main/examples/servers/router/prefix.js)
 
 ## Roteamento RESTful 🎯
 

@@ -19,18 +19,18 @@ import { AzuraClient } from "azurajs";
 
 const app = new AzuraClient();
 
-app.get("/", (req, res) => {
+app.get("/", ({ req, res }) => {
   res.json({ message: "Olá do AzuraJS no Bun!" });
 });
 
-app.get("/user/:id", (req, res) => {
+app.get("/user/:id", ({ req, res }) => {
   res.json({ 
     userId: req.params.id,
     runtime: "Bun" 
   });
 });
 
-app.post("/data", (req, res) => {
+app.post("/data", ({ req, res }) => {
   res.json({ 
     received: req.body,
     timestamp: Date.now() 
@@ -53,18 +53,18 @@ const { AzuraClient } = require("azurajs");
 
 const app = new AzuraClient();
 
-app.get("/", (req, res) => {
+app.get("/", ({ req, res }) => {
   res.json({ message: "Olá do AzuraJS no Bun!" });
 });
 
-app.get("/user/:id", (req, res) => {
+app.get("/user/:id", ({ req, res }) => {
   res.json({ 
     userId: req.params.id,
     runtime: "Bun" 
   });
 });
 
-app.post("/data", (req, res) => {
+app.post("/data", ({ req, res }) => {
   res.json({ 
     received: req.body,
     timestamp: Date.now() 
@@ -91,7 +91,7 @@ bun run bun-server.ts
 - ⚡ **3x mais rápido** que Node.js
 - 🚀 Suporte **nativo a TypeScript**
 - 📦 **Bundler integrado** e test runner
-- 🔥 **Hot reload** pronto para uso
+- 🔥 **Reload** pronto para uso
 
 ## Usando com Deno 🦕
 
@@ -104,11 +104,11 @@ import { AzuraClient } from "azurajs";
 
 const app = new AzuraClient();
 
-app.get("/", (req, res) => {
+app.get("/", ({ req, res }) => {
   res.json({ message: "Olá do AzuraJS no Deno!" });
 });
 
-app.get("/api/:name", (req, res) => {
+app.get("/api/:name", ({ req, res }) => {
   res.json({ 
     greeting: `Olá ${req.params.name}!`,
     runtime: "Deno" 
@@ -128,11 +128,11 @@ const { AzuraClient } = require("azurajs");
 
 const app = new AzuraClient();
 
-app.get("/", (req, res) => {
+app.get("/", ({ req, res }) => {
   res.json({ message: "Olá do AzuraJS no Deno!" });
 });
 
-app.get("/api/:name", (req, res) => {
+app.get("/api/:name", ({ req, res }) => {
   res.json({ 
     greeting: `Olá ${req.params.name}!`,
     runtime: "Deno" 
@@ -169,14 +169,14 @@ import { AzuraClient } from "azurajs";
 
 const app = new AzuraClient();
 
-app.get("/", (req, res) => {
+app.get("/", ({ req, res }) => {
   res.json({ 
     message: "Olá da Edge!",
     location: "Cloudflare Workers" 
   });
 });
 
-app.get("/api/:id", (req, res) => {
+app.get("/api/:id", ({ req, res }) => {
   res.json({ 
     id: req.params.id,
     deployed: "globalmente" 
@@ -196,14 +196,14 @@ const { AzuraClient } = require("azurajs");
 
 const app = new AzuraClient();
 
-app.get("/", (req, res) => {
+app.get("/", ({ req, res }) => {
   res.json({ 
     message: "Olá da Edge!",
     location: "Cloudflare Workers" 
   });
 });
 
-app.get("/api/:id", (req, res) => {
+app.get("/api/:id", ({ req, res }) => {
   res.json({ 
     id: req.params.id,
     deployed: "globalmente" 
@@ -236,7 +236,7 @@ import { UserController } from "./controllers/UserController";
 const app = new AzuraClient();
 
 // Rota simples
-app.get("/", (req, res) => {
+app.get("/", ({ req, res }) => {
   res.json({ message: "Olá do Node.js!" });
 });
 
@@ -256,7 +256,7 @@ const { UserController } = require("./controllers/UserController");
 const app = new AzuraClient();
 
 // Rota simples
-app.get("/", (req, res) => {
+app.get("/", ({ req, res }) => {
   res.json({ message: "Olá do Node.js!" });
 });
 
@@ -291,7 +291,7 @@ import { AzuraClient } from "azurajs";
 
 const app = new AzuraClient();
 
-app.get("/api/hello", (req, res) => {
+app.get("/api/hello", ({ req, res }) => {
   res.json({ message: "Olá da Vercel Edge!" });
 });
 
@@ -396,7 +396,7 @@ export default config;
 ## Melhores Práticas ✨
 
 <Callout type="tip">
-  **Use Bun para desenvolvimento** - Hot reload e startup mais rápidos
+  **Use Bun para desenvolvimento** - Reload e startup mais rápidos
 </Callout>
 
 <Callout type="tip">

@@ -3,7 +3,6 @@ import cluster from "node:cluster";
 import os from "node:os";
 
 import { ConfigModule } from "../shared/config/ConfigModule";
-import { getOpenPort } from "./utils/GetOpenPort";
 import type { RequestServer } from "../types/http/request.type";
 import type { CookieOptions, ResponseServer } from "../types/http/response.type";
 import { HttpError } from "./utils/HttpError";
@@ -18,8 +17,11 @@ import { getIP } from "./utils/GetIp";
 import type { Handler } from "./utils/route/Node";
 import { cors } from "../shared/plugins/CORSPlugin";
 import { rateLimit } from "../shared/plugins/RateLimitPlugin";
+import type { ProxyOptions } from "../types";
+import { proxyPlugin } from "../shared/plugins";
 
 export { createLoggingMiddleware } from "../middleware/LoggingMiddleware";
+export { proxyPlugin, createProxyMiddleware } from "../shared/plugins/ProxyPlugin";
 
 export class AzuraClient {
   private opts: ReturnType<ConfigModule["getAll"]>;
@@ -28,8 +30,9 @@ export class AzuraClient {
   private port: number = 3000;
   private initPromise: Promise<void>;
 
-  public router: Router;
+  private router: Router;
   private middlewares: RequestHandler[] = [];
+  private proxies: Array<{ path: string; handler: RequestHandler }> = [];
 
   constructor() {
     const config = new ConfigModule();
@@ -41,7 +44,7 @@ export class AzuraClient {
       process.exit(1);
     }
     this.opts = config.getAll();
-    this.router = new Router(this.opts.debug || false);
+    this.router = new Router(this.opts.debug);
     this.initPromise = this.init();
     this.setupDefaultRoutes();
   }
@@ -92,11 +95,24 @@ export class AzuraClient {
     this.server.on("request", this.handle.bind(this));
   }
 
-  public use(mw: RequestHandler) {
-    this.middlewares.push(mw);
+  public use(mw: RequestHandler): void;
+  public use(prefix: string, router: Router): void;
+  public use(prefixOrMw: string | RequestHandler, router?: Router): void {
+    if (typeof prefixOrMw === "function") {
+      this.middlewares.push(prefixOrMw);
+    } else if (typeof prefixOrMw === "string" && router instanceof Router) {
+      const prefix = prefixOrMw.endsWith("/") ? prefixOrMw.slice(0, -1) : prefixOrMw;
+      const routes = router.listRoutes();
+
+      for (const route of routes) {
+        const fullPath = prefix + (route.path === "/" ? "" : route.path);
+        const { handlers } = router.find(route.method, route.path);
+        this.router.add(route.method, fullPath, ...handlers);
+      }
+    }
   }
 
-  public addRoute(method: string, path: string, ...handlers: RequestHandler[]) {
+  private addRoute(method: string, path: string, ...handlers: RequestHandler[]) {
     const adapted = handlers.map(adaptRequestHandler);
     this.router.add(method, path, ...(adapted as unknown as Handler[]));
   }
@@ -106,6 +122,29 @@ export class AzuraClient {
   public put = (p: string, ...h: RequestHandler[]) => this.addRoute("PUT", p, ...h);
   public delete = (p: string, ...h: RequestHandler[]) => this.addRoute("DELETE", p, ...h);
   public patch = (p: string, ...h: RequestHandler[]) => this.addRoute("PATCH", p, ...h);
+
+  /**
+   * Configures a proxy for a specific route
+   * @param path - Path of the route to be proxied
+   * @param target - Destination server URL
+   * @param options - Additional proxy options
+   * * @example
+   * ```typescript
+   * // Simple proxy
+   * app.proxy('/api', 'http://localhost:4000');
+   * * // With advanced options
+   * app.proxy('/api', 'http://localhost:4000', {
+   * pathRewrite: { '^/api': '' },
+   * headers: { 'X-Custom-Header': 'value' }
+   * });
+   * ```
+   */
+  public proxy(path: string, target: string, options: Partial<ProxyOptions> = {}) {
+    const proxyMiddleware = proxyPlugin(target, options);
+
+    // Adicionar à lista de proxies
+    this.proxies.push({ path, handler: proxyMiddleware });
+  }
 
   public getRoutes() {
     return this.router.listRoutes();
@@ -500,6 +539,42 @@ export class AzuraClient {
     };
 
     try {
+      for (const proxy of this.proxies) {
+        if (rawReq.path.startsWith(proxy.path)) {
+          const chain = this.middlewares.map(adaptRequestHandler);
+          let idx = 0;
+          let middlewareError = false;
+
+          const middlewareNext = async (err?: any) => {
+            if (err) {
+              middlewareError = true;
+              return errorHandler(err);
+            }
+            if (idx >= chain.length) return;
+            const fn = chain[idx++];
+            try {
+              await fn({
+                request: rawReq,
+                response: rawRes,
+                req: rawReq,
+                res: rawRes,
+                next: middlewareNext,
+              });
+            } catch (e) {
+              middlewareError = true;
+              return errorHandler(e);
+            }
+          };
+
+          await middlewareNext();
+
+          if (!middlewareError) {
+            await proxy.handler(rawReq, rawRes, middlewareNext);
+          }
+          return;
+        }
+      }
+
       const { handlers, params } = this.router.find(rawReq.method || "GET", rawReq.path);
       rawReq.params = params || {};
       const chain = [

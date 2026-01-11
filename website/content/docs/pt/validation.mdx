@@ -249,7 +249,7 @@ function validateBody<T>(schema: z.ZodSchema<T>) {
 }
 
 // Usar como middleware
-app.post("/api/users", validateBody(CreateUserSchema), (req, res) => {
+app.post("/api/users", validateBody(CreateUserSchema), ({ req, res }) => {
   const data = req.validatedBody;  // Dados validados e tipados
   const user = createUser(data);
   res.status(201).json({ user });

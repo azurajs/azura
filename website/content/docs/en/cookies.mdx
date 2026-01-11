@@ -33,7 +33,7 @@ getProfile(@Req() req: RequestServer, @Res() res: ResponseServer) {
 ```javascript
 const { parseCookiesHeader } = require("azurajs/cookies");
 
-app.get("/profile", (req, res) => {
+app.get("/profile", ({ req, res }) => {
   const cookies = parseCookiesHeader(req.headers.cookie || "");
   const sessionId = cookies.sessionId;
   
@@ -74,7 +74,7 @@ login(@Body() credentials: any, @Res() res: ResponseServer) {
 ```javascript
 const { serializeCookie } = require("azurajs/cookies");
 
-app.post("/login", (req, res) => {
+app.post("/login", ({ req, res }) => {
   // Authenticate user...
   const sessionId = generateSessionId();
   
@@ -237,7 +237,7 @@ export class AuthController {
 const { parseCookiesHeader, serializeCookie } = require("azurajs/cookies");
 
 // Login and set session cookie
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", ({ req, res }) => {
   const credentials = req.body;
   
   // Validate credentials
@@ -263,7 +263,7 @@ app.post("/api/auth/login", (req, res) => {
 });
 
 // Get user from session cookie
-app.get("/api/auth/me", (req, res) => {
+app.get("/api/auth/me", ({ req, res }) => {
   const cookies = parseCookiesHeader(req.headers.cookie || "");
   const sessionId = cookies.sessionId;
   
@@ -280,7 +280,7 @@ app.get("/api/auth/me", (req, res) => {
 });
 
 // Logout and clear cookie
-app.post("/api/auth/logout", (req, res) => {
+app.post("/api/auth/logout", ({ req, res }) => {
   // Clear cookie by setting maxAge to 0
   const cookie = serializeCookie("sessionId", "", {
     httpOnly: true,

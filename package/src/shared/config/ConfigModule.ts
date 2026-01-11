@@ -6,7 +6,7 @@ import path from "node:path";
  * ex: azura.config.*extension
  */
 
-type SupportedConfigFile = ".ts" | ".json" | ".yaml" | ".yml";
+type SupportedConfigFile = ".js" | ".ts" | ".json" | ".yaml" | ".yml";
 
 export type ConfigTypes = {
   environment?: "development" | "production";
@@ -66,6 +66,7 @@ export class ConfigModule {
         let parsed: ConfigTypes;
         switch (extension) {
           case ".ts":
+          case ".js":
             const mod = require(filePath);
             parsed = mod.default || mod;
             break;

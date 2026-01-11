@@ -1,211 +1,48 @@
-# AzuraJS Examples
+# AzuraJS Server Examples
 
-This directory contains example applications demonstrating various features of AzuraJS.
+Exemplos organizados por categoria. Execute com `bun run servers/<categoria>/<arquivo>`.
 
-> **Note:** These examples import from `../package/src` (local development). When using AzuraJS in your own project, import from `"azurajs"` instead.
+## 📁 Estrutura
 
-## Folder Structure
+### `/basic` - Exemplos Básicos
+- `server.js` - Servidor básico com rotas simples
+- `crud-api.js` - API CRUD completa
+- `cookies.js` - Manipulação de cookies
+- `error-handling.js` - Tratamento de erros
 
-```
-examples/
-├── controllers/         # Example controllers
-├── servers/            # Server implementation examples
-│   ├── basic-server.js       # Basic server example
-│   ├── bun-server.ts         # Bun.serve example
-│   ├── cookies-server.js     # Cookie handling
-│   ├── crud-api.js           # CRUD operations
-│   ├── error-handling.js     # Error handling
-│   ├── middleware-server.js  # Middleware usage
-│   ├── plugins-server.js     # Plugin system
-│   └── test-debug.js         # Debug example
-├── types/              # Type definitions
-├── index.ts            # Main entry point
-└── azura.config.ts     # Configuration file
-```
+### `/middleware` - Middlewares
+- `basic.js` - Logging e autenticação
 
-## Getting Started
+### `/router` - Roteamento
+- `prefix.js` - Routers com prefixos de caminho
 
-### Using Node.js / Bun (default)
+### `/proxy` - Sistema de Proxy
+- `simple.js` - Proxy básico entre dois servidores
+- `microservices.js` - Gateway para microsserviços
 
-```bash
-bun install
-bun run start
-```
+### `/advanced` - Exemplos Avançados
+- `bun-server.ts` - Usando Bun.serve
+- `plugins.js` - Plugins (CORS, Rate Limit)
 
-### Using Bun.serve
+## 🚀 Quick Start
 
 ```bash
-bun run servers/bun-server.ts
+# Servidor básico
+bun run servers/basic/server.js
+
+# Proxy simples
+bun run servers/proxy/simple.js
+
+# Router modular
+bun run servers/router/prefix.js
+
+# Microsserviços
+bun run servers/proxy/microservices.js
 ```
 
-### Using Deno
+## 📖 Documentação
 
-```bash
-deno run --allow-net --allow-read servers/deno-server.ts
-```
-
-The server will start at `http://localhost:3000`
-
-## Available Examples
-
-### 1. Standard Server (`index.ts`)
-Default AzuraJS server using built-in Node.js HTTP server with decorators and controllers.
-
-### 2. Basic Server (`servers/basic-server.js`)
-Simple server setup demonstrating the fundamental concepts.
-
-### 3. Bun Server (`servers/bun-server.ts`)
-Example using AzuraJS with Bun's native `Bun.serve` for maximum performance.
-
-### 4. Deno Server (`servers/deno-server.ts`)
-Example using AzuraJS with Deno's `Deno.serve` runtime.
-
-### 5. Cookies Server (`servers/cookies-server.js`)
-Example demonstrating cookie handling and management.
-
-### 6. CRUD API (`servers/crud-api.js`)
-Full CRUD operations example with RESTful endpoints.
-
-### 7. Error Handling (`servers/error-handling.js`)
-Custom error handling and HTTP error responses.
-
-### 8. Middleware Server (`servers/middleware-server.js`)
-Example showcasing middleware implementation and usage.
-
-### 9. Plugins Server (`servers/plugins-server.js`)
-Plugin system demonstration with CORS and rate limiting.
-
-### 10. Cloudflare Worker (`servers/cloudflare-worker.ts`)
-Example deploying AzuraJS to Cloudflare Workers edge network.
-
-## Available Routes
-
-### Home Page
-
-- **GET /** - Interactive documentation with all available routes
-
-### Health Check
-
-- **GET /ping** - Simple health check endpoint
-
-### User API
-
-- **GET /api/users** - List all users
-- **GET /api/users/:id** - Get user by ID
-- **POST /api/users** - Create new user
-- **PUT /api/users/:id** - Update user
-- **DELETE /api/users/:id** - Delete user
-
-### Search
-
-- **GET /search?q=query&page=1** - Search with query parameters
-- **GET /search/advanced** - Advanced search with filters
-
-## Testing Routes
-
-### Using cURL
-
-```bash
-curl http://localhost:3000/ping
-
-curl http://localhost:3000/api/users
-
-curl http://localhost:3000/api/users/1
-
-curl -X POST http://localhost:3000/api/users \
-  -H "Content-Type: application/json" \
-  -d '{"name":"John Doe","email":"john@example.com"}'
-
-curl -X PUT http://localhost:3000/api/users/1 \
-  -H "Content-Type: application/json" \
-  -d '{"name":"John Updated"}'
-
-curl -X DELETE http://localhost:3000/api/users/1
-
-curl "http://localhost:3000/search?q=azurajs&page=1"
-```
-
-### Using Browser
-
-Simply navigate to `http://localhost:3000` to see the interactive documentation.
-
-## Configuration
-
-The example uses `azura.config.ts` for configuration:
-
-- **Environment**: Development mode by default
-- **Port**: 3000
-- **Logging**: Enabled with detailed output
-- **CORS**: Enabled for all origins
-
-## Logging
-
-The example includes request/response logging that shows:
-
-- HTTP method and URL
-- Client IP address
-- Query parameters
-- Route parameters
-- Request body
-- Response status code
-- Response time in milliseconds
-
-Example output:
-
-```
-🔵 [2026-01-07T00:30:45.123Z] GET /api/users | IP: ::1
-✅ 200 - 5ms
-```
-
-## Switching to Production Mode
-
-```bash
-NODE_ENV=production bun run start
-```
-
-In production mode:
-
-- Logging is more concise
-- Details are hidden for security
-- Performance is optimized
-
-## Project Structure
-
-```
-test/
-├── index.ts                    # Main application entry point
-├── azura.config.ts             # Configuration file
-├── controllers/                # Controllers directory
-│   ├── index.ts               # Export all controllers
-│   ├── HomeController.ts      # Home and health check routes
-│   ├── UserController.ts      # User CRUD operations
-│   └── SearchController.ts    # Search functionality
-├── types/                      # TypeScript types and interfaces
-│   └── index.ts               # Shared type definitions
-├── package.json               # Dependencies
-└── EXAMPLE.md                 # This file
-```
-
-## Features Demonstrated
-
-✅ Decorator-based routing  
-✅ Controller organization  
-✅ Parameter injection (@Body, @Query, @Param, @Res)  
-✅ Middleware usage  
-✅ Request logging  
-✅ Configuration management  
-✅ Environment-based settings  
-✅ JSON responses  
-✅ HTML responses  
-✅ Status codes  
-✅ Query parameters  
-✅ Route parameters  
-✅ Request body parsing  
-✅ CRUD operations  
-✅ Error handling
-
-## Learn More
-
-- [AzuraJS Documentation](../package/README.md)
-- [API Reference](../package/README.md#api-reference)
-- [Configuration Guide](../package/README.md#configuration)
+Para documentação completa sobre cada recurso:
+- [Proxy System](../../docs/PROXY.md)
+- [API Reference](../../docs/API.md)
+- [Getting Started](../../docs/GETTING_STARTED.md)

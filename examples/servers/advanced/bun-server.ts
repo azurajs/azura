@@ -1,5 +1,4 @@
-import { AzuraClient } from "../package/src";
-
+import { AzuraClient } from "../../../package/src";
 const app = new AzuraClient();
 
 app.get("/", (req, res) => {
@@ -20,4 +19,6 @@ const server = Bun.serve({
   fetch: app.fetch.bind(app),
 });
 
-console.log(`🚀 AzuraJS running on Bun at http://localhost:${server.port}`);
+console.log(`\n🚀 AzuraJS running on Bun!`);
+console.log(`   http://localhost:${server.port}/`);
+console.log(`   http://localhost:${server.port}/user/123`);

@@ -8,7 +8,7 @@ interface MatchResult {
 
 export class Router {
   private root = new Node();
-  private debug: boolean;
+  private debug?: boolean;
 
   constructor(debug = false) {
     this.debug = debug;

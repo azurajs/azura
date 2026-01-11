@@ -34,7 +34,7 @@ getProfile(@Headers("cookie") cookieHeader: string) {
 ```javascript
 const { parseCookiesHeader } = require("azurajs/cookies");
 
-app.get("/profile", (req, res) => {
+app.get("/profile", ({ req, res }) => {
   const cookieHeader = req.headers["cookie"];
   const cookies = parseCookiesHeader(cookieHeader);
   
@@ -79,7 +79,7 @@ login(@Body() credentials: any, @Res() res: ResponseServer) {
 ```javascript
 const { serializeCookie } = require("azurajs/cookies");
 
-app.post("/login", (req, res) => {
+app.post("/login", ({ req, res }) => {
   // Autenticar usuário
   const user = authenticate(req.body);
   

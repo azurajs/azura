@@ -51,7 +51,7 @@ const app = new AzuraClient();
 const logger = createLoggingMiddleware(app.getConfig());
 app.use(logger);
 
-app.get("/", (req, res) => {
+app.get("/", ({ req, res }) => {
   res.json({ message: "Hello from JavaScript!" });
 });
 
@@ -76,24 +76,24 @@ import { AzuraClient } from "azurajs";
 const app = new AzuraClient();
 
 // GET route
-app.get("/users", (req, res) => {
+app.get("/users", ({ req, res }) => {
   res.json({ users: [] });
 });
 
 // POST route
-app.post("/users", (req, res) => {
+app.post("/users", ({ req, res }) => {
   const body = req.body;
   res.status(201).json({ created: body });
 });
 
 // PUT route
-app.put("/users/:id", (req, res) => {
+app.put("/users/:id", ({ req, res }) => {
   const { id } = req.params;
   res.json({ id, updated: true });
 });
 
 // DELETE route
-app.delete("/users/:id", (req, res) => {
+app.delete("/users/:id", ({ req, res }) => {
   const { id } = req.params;
   res.status(204).send();
 });
@@ -103,25 +103,25 @@ app.delete("/users/:id", (req, res) => {
 
 ```javascript
 // Path parameters
-app.get("/users/:id/posts/:postId", (req, res) => {
+app.get("/users/:id/posts/:postId", ({ req, res }) => {
   const { id, postId } = req.params;
   res.json({ userId: id, postId });
 });
 
 // Query parameters
-app.get("/search", (req, res) => {
+app.get("/search", ({ req, res }) => {
   const { q, limit = 10, page = 1 } = req.query;
   res.json({ query: q, limit: Number(limit), page: Number(page) });
 });
 
 // Request body
-app.post("/data", (req, res) => {
+app.post("/data", ({ req, res }) => {
   const body = req.body;
   res.json({ received: body });
 });
 
 // Headers
-app.get("/info", (req, res) => {
+app.get("/info", ({ req, res }) => {
   const userAgent = req.headers["user-agent"];
   res.json({ userAgent });
 });
@@ -163,7 +163,7 @@ const authMiddleware = (req, res, next) => {
 };
 
 // Apply to specific routes
-app.get("/protected", authMiddleware, (req, res) => {
+app.get("/protected", authMiddleware, ({ req, res }) => {
   res.json({ user: req.user });
 });
 ```
@@ -217,7 +217,7 @@ const users = [
 let nextId = 3;
 
 // List all users
-app.get("/api/users", (req, res) => {
+app.get("/api/users", ({ req, res }) => {
   const { page = 1, limit = 10 } = req.query;
   const startIndex = (page - 1) * limit;
   const endIndex = startIndex + Number(limit);
@@ -233,7 +233,7 @@ app.get("/api/users", (req, res) => {
 });
 
 // Get user by ID
-app.get("/api/users/:id", (req, res) => {
+app.get("/api/users/:id", ({ req, res }) => {
   const { id } = req.params;
   const user = users.find(u => u.id === Number(id));
   
@@ -245,7 +245,7 @@ app.get("/api/users/:id", (req, res) => {
 });
 
 // Create user
-app.post("/api/users", (req, res) => {
+app.post("/api/users", ({ req, res }) => {
   const { name, email } = req.body;
   
   if (!name || !email) {
@@ -264,7 +264,7 @@ app.post("/api/users", (req, res) => {
 });
 
 // Update user
-app.put("/api/users/:id", (req, res) => {
+app.put("/api/users/:id", ({ req, res }) => {
   const { id } = req.params;
   const { name, email } = req.body;
   
@@ -282,7 +282,7 @@ app.put("/api/users/:id", (req, res) => {
 });
 
 // Delete user
-app.delete("/api/users/:id", (req, res) => {
+app.delete("/api/users/:id", ({ req, res }) => {
   const { id } = req.params;
   const index = users.findIndex(u => u.id === Number(id));
   
@@ -295,7 +295,7 @@ app.delete("/api/users/:id", (req, res) => {
 });
 
 // Health check
-app.get("/health", (req, res) => {
+app.get("/health", ({ req, res }) => {
   res.json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
@@ -307,7 +307,7 @@ await app.listen();
 
 ```javascript
 // Set cookie
-app.get("/login", (req, res) => {
+app.get("/login", ({ req, res }) => {
   res.cookie("session", "abc123", {
     httpOnly: true,
     maxAge: 3600000, // 1 hour
@@ -317,7 +317,7 @@ app.get("/login", (req, res) => {
 });
 
 // Read cookie
-app.get("/profile", (req, res) => {
+app.get("/profile", ({ req, res }) => {
   const session = req.cookies.session;
   if (!session) {
     return res.status(401).json({ error: "Not authenticated" });
@@ -326,7 +326,7 @@ app.get("/profile", (req, res) => {
 });
 
 // Clear cookie
-app.get("/logout", (req, res) => {
+app.get("/logout", ({ req, res }) => {
   res.clearCookie("session");
   res.json({ message: "Logged out" });
 });
@@ -346,7 +346,7 @@ app.use((req, res, next) => {
 });
 
 // Route-level error handling
-app.get("/risky", (req, res) => {
+app.get("/risky", ({ req, res }) => {
   try {
     // Risky operation
     throw new Error("Something went wrong");
