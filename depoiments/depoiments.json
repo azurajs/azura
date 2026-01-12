@@ -6,6 +6,13 @@
       "role": "Creator & Maintainer",
       "description": "AzuraJS foi criado para resolver os problemas que eu enfrentava no dia a dia. É incrível ver a comunidade crescendo!",
       "avatar": "https://github.com/0xviny.png"
+    },
+    {
+      "user": "ThisPythonJS",
+      "name": "python.js",
+      "role": "Partner and Supporter",
+      "description": "O AzuraJS foi fundamental para resolver os problemas que eu enfrentava ao usar Express. Eu acho incrivel o que o Viny faz pelo projeto e pela comunidade. Sem o AzuraJS eu não poderia ter uma API segura e Rápida.",
+      "avatar": "https://github.com/ThisPythonJS.png"
     }
   ]
 }
