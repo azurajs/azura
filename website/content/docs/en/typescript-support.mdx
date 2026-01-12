@@ -16,7 +16,7 @@ All AzuraJS APIs are fully typed:
 import type {
   RequestServer,
   ResponseServer,
-} from "azurajs";
+} from "azurajs/types";
 import type { RequestHandler } from "azurajs/types";
 import type { ConfigTypes } from "azurajs/config";
 import type { CookieOptions } from "azurajs/cookies";
@@ -87,7 +87,7 @@ interface UpdateUserDto {
 
 // Use in controller
 import { Controller, Post, Body, Res } from "azurajs/decorators";
-import type { ResponseServer } from "azurajs";
+import type { ResponseServer } from "azurajs/types";
 
 @Controller("/api/users")
 export class UserController {
@@ -232,7 +232,7 @@ createUser(@Body() body: unknown, @Res() res: ResponseServer): void {
 Create typed middleware:
 
 ```typescript
-import type { RequestServer } from "azurajs";
+import type { RequestServer } from "azurajs/types";
 import type { RequestHandler } from "azurajs/types";
 
 interface AuthenticatedRequest extends RequestServer {

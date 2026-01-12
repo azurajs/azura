@@ -591,7 +591,7 @@ serializeCookie("token", "value", {
 import { Controller, Post, Body, Res } from "azurajs/decorators";
 import { parseCookiesHeader, serializeCookie } from "azurajs/cookies";
 import type { CookieOptions } from "azurajs/cookies";
-import type { ResponseServer } from "azurajs";
+import type { ResponseServer } from "azurajs/types";
 
 @Controller("/api/auth")
 export class AuthController {

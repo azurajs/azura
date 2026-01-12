@@ -254,7 +254,7 @@ createUser(@Body() data: unknown, @Res() res: ResponseServer) {
 Log erros para análise posterior:
 
 ```typescript
-import { Logger } from "azurajs";
+import { Logger } from "azurajs/logger";
 
 function errorHandler(
   error: any,
@@ -569,7 +569,7 @@ export class ConflictError extends HttpError {
 }
 
 // middleware/errorHandler.ts
-import { Logger } from "azurajs";
+import { Logger } from "azurajs/logger";
 import * as Sentry from "@sentry/node";
 
 export function errorHandler(

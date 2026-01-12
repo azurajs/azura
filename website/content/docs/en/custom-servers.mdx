@@ -299,7 +299,7 @@ Here's a full example that works everywhere:
 ```typescript title="universal-app.ts"
 import { AzuraClient } from "azurajs";
 import { Controller, Get, Post, Body, Param, Res } from "azurajs/decorators";
-import type { ResponseServer } from "azurajs";
+import type { ResponseServer } from "azurajs/types";
 
 @Controller("/api")
 class ApiController {

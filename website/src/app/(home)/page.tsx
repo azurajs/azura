@@ -271,14 +271,14 @@ function TestimonialsSection() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('https://raw.githubusercontent.com/0xviny/azurajs/main/depoiments/depoiments.json')
-      .then(res => res.json())
-      .then(data => {
+    fetch("https://raw.githubusercontent.com/0xviny/azurajs/main/depoiments/depoiments.json")
+      .then((res) => res.json())
+      .then((data) => {
         setTestimonials(data.depoiments || []);
         setLoading(false);
       })
-      .catch(error => {
-        console.error('Failed to load testimonials:', error);
+      .catch((error) => {
+        console.error("Failed to load testimonials:", error);
         setLoading(false);
       });
   }, []);
@@ -320,17 +320,13 @@ function TestimonialsSection() {
                   alt={testimonial.name || testimonial.user}
                   className="w-12 h-12 rounded-full border-2 border-white/10"
                   onError={(e) => {
-                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.style.display = "none";
                   }}
                 />
               )}
               <div className="flex-1">
-                <h3 className="text-white font-semibold">
-                  {testimonial.name || testimonial.user}
-                </h3>
-                {testimonial.role && (
-                  <p className="text-xs text-neutral-500">{testimonial.role}</p>
-                )}
+                <h3 className="text-white font-semibold">{testimonial.name || testimonial.user}</h3>
+                {testimonial.role && <p className="text-xs text-neutral-500">{testimonial.role}</p>}
               </div>
               <Quote size={20} className="text-blue-400/40" />
             </div>
@@ -355,8 +351,13 @@ function PartnersSection() {
     {
       name: "Cheetah Solutions",
       logo: "/partners/cheetah.png",
-      url: "https://www.cheetahsolutions.com.br/"
-    }
+      url: "https://www.cheetahsolutions.com.br/",
+    },
+    {
+      name: "Simo",
+      logo: "/partners/simo.png",
+      url: "https://simobotlist.online/",
+    },
   ];
 
   return (

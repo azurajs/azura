@@ -82,7 +82,7 @@ import {
   Param, 
   Res 
 } from "azurajs/decorators";
-import type { ResponseServer } from "azurajs";
+import type { ResponseServer } from "azurajs/types";
 
 @Controller("/api/users")
 export class UserController {
@@ -301,7 +301,7 @@ Use blocos try-catch e respostas de erro consistentes:
 ```typescript
 import { Controller, Post, Body, Res } from "azurajs/decorators";
 import { HttpError } from "azurajs/http-error";
-import type { ResponseServer } from "azurajs";
+import type { ResponseServer } from "azurajs/types";
 
 @Controller("/api/users")
 export class UserController {

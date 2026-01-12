@@ -17,7 +17,7 @@ Use the built-in `HttpError` class for HTTP errors:
 ```typescript
 import { Get, Param, Res } from "azurajs/decorators";
 import { HttpError } from "azurajs/http-error";
-import type { ResponseServer } from "azurajs";
+import type { ResponseServer } from "azurajs/types";
 
 @Get("/:id")
 getUser(@Param("id") id: string, @Res() res: ResponseServer) {
@@ -339,7 +339,7 @@ async createUser(@Body() data: any, @Res() res: ResponseServer) {
 Log errors for monitoring:
 
 ```typescript
-import { logger } from "azurajs";
+import { logger } from "azurajs/logger";
 
 export const errorLogger: RequestHandler = async (req, res, next) => {
   try {

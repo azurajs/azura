@@ -214,7 +214,7 @@ Vou continuar com mais conteúdo em uma segunda parte, pois a documentação é 
 ```typescript
 import { Post, Body, Res } from "azurajs/decorators";
 import { serializeCookie } from "azurajs/cookies";
-import type { ResponseServer } from "azurajs";
+import type { ResponseServer } from "azurajs/types";
 
 @Post("/login")
 login(@Body() credentials: any, @Res() res: ResponseServer) {

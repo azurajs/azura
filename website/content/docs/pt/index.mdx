@@ -33,15 +33,8 @@ icon: Zap
 ## 🚀 Exemplo Rápido
 
 ```typescript
-import { 
-  AzuraClient, 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Param,
-  applyDecorators 
-} from "azurajs";
+import { AzuraClient, applyDecorators } from "azurajs";
+import { Controller, Get, Post, Body, Param } from "azurajs/decorators";
 
 @Controller("/api/users")
 class UserController {

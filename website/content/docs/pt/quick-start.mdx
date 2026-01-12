@@ -88,7 +88,7 @@ Crie `src/controllers/UserController.ts`:
 
 ```typescript title="src/controllers/UserController.ts"
 import { Controller, Get, Post, Put, Delete, Body, Param, Res } from "azurajs/decorators";
-import type { ResponseServer } from "azurajs";
+import type { ResponseServer } from "azurajs/types";
 
 // Banco de dados em memória (para fins de demonstração)
 const users = [

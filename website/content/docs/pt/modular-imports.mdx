@@ -66,7 +66,7 @@ const { createLoggingMiddleware } = require("azurajs/middleware");
 Importe tipos TypeScript:
 
 ```typescript
-import type { RequestServer, ResponseServer } from "azurajs";
+import type { RequestServer, ResponseServer } from "azurajs/types";
 // Ou use importação modular
 import type { ConfigTypes } from "azurajs/config";
 ```
@@ -143,7 +143,7 @@ import { createLoggingMiddleware } from "azurajs/middleware";
 import { HttpError } from "azurajs/http-error";
 
 // Tipos
-import type { ResponseServer } from "azurajs";
+import type { ResponseServer } from "azurajs/types";
 import type { ConfigTypes } from "azurajs/config";
 
 @Controller("/users")
@@ -184,9 +184,10 @@ await app.listen(3000);
 
 ## Comparação de Importações
 
-### Antes (Bundle completo)
+### Antes (❌ Não funciona mais)
 
 ```typescript
+// Este exemplo NÃO funciona mais na versão 2.4.0+
 import {
   AzuraClient,
   Controller,
@@ -202,12 +203,15 @@ import {
 
 **Tamanho do bundle:** ~50KB (tudo incluído)
 
-### Depois (Importações modulares)
+### Depois (✅ Correto - Importações modulares)
 
 ```typescript
 import { AzuraClient } from "azurajs";
 import { Controller, Get, Post, Body } from "azurajs/decorators";
 import { HttpError } from "azurajs/http-error";
+import { logger } from "azurajs/logger";
+import { cors } from "azurajs/cors";
+import { rateLimit } from "azurajs/rate-limit";
 ```
 
 **Tamanho do bundle:** ~15KB (apenas o necessário)
@@ -217,27 +221,27 @@ import { HttpError } from "azurajs/http-error";
 Se você está usando importações antigas, veja como migrar:
 
 ```typescript
-// Jeito antigo
+// ❌ Jeito antigo (não funciona mais)
 import { validateDto } from "azurajs";
 
-// Jeito novo (recomendado)
+// ✅ Jeito novo (correto)
 import { validateDto } from "azurajs/validators";
 
-// Jeito antigo
+// ❌ Jeito antigo (não funciona mais)
 import { HttpError } from "azurajs";
 
-// Jeito novo (recomendado)
+// ✅ Jeito novo (correto)
 import { HttpError } from "azurajs/http-error";
 
-// Jeito antigo
+// ❌ Jeito antigo (não funciona mais)
 import { cors } from "azurajs";
 
-// Jeito novo (recomendado)
+// ✅ Jeito novo (correto)
 import { cors } from "azurajs/cors";
 ```
 
-<Callout type="info">
-  **Ambas as formas funcionam!** O pacote principal re-exporta tudo por conveniência, mas importações modulares são recomendadas para builds de produção.
+<Callout type="warn">
+  **Atenção!** A partir da versão 2.4.0, você DEVE usar imports modulares. O pacote principal (`azurajs`) exporta apenas `AzuraClient`, `applyDecorators` e tipos básicos. Funcionalidades específicas como logger, validators, http-error, cors, etc. devem ser importados de seus respectivos módulos.
 </Callout>
 
 ## Módulos Disponíveis

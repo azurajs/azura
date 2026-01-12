@@ -27,7 +27,7 @@ import {
 } from "azurajs/decorators";
 import { HttpError } from "azurajs/http-error";
 import { createLoggingMiddleware } from "azurajs/middleware";
-import type { ResponseServer } from "azurajs";
+import type { ResponseServer } from "azurajs/types";
 
 // Types
 interface Post {
@@ -292,15 +292,10 @@ await app.listen();
 
 ```typescript title="src/controllers/AuthController.ts"
 import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Headers,
-  Res,
-  HttpError,
-} from "azurajs";
-import type { ResponseServer } from "azurajs";
+import { AzuraClient, applyDecorators } from "azurajs";
+import type { ResponseServer } from "azurajs/types";
+import { Controller, Post, Get, Body, Headers, Res } from "azurajs/decorators";
+import { HttpError } from "azurajs/http-error";
 import { sign, verify } from "jsonwebtoken";
 import { hash, compare } from "bcrypt";
 
@@ -424,7 +419,7 @@ export class AuthController {
 
 ```typescript title="src/controllers/UploadController.ts"
 import { Controller, Post, Req, Res } from "azurajs/decorators";
-import type { RequestServer, ResponseServer } from "azurajs";
+import type { RequestServer, ResponseServer } from "azurajs/types";
 import { writeFile, mkdir } from "fs/promises";
 import { randomUUID } from "crypto";
 import { join } from "path";

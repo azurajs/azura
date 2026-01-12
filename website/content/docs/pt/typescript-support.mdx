@@ -35,7 +35,7 @@ AzuraJS exporta todos os tipos necessários:
 import type {
   RequestServer,
   ResponseServer,
-} from "azurajs";
+} from "azurajs/types";
 import type { ConfigTypes } from "azurajs/config";
 import type { RequestHandler } from "azurajs/types";
 import type { CORSOptions } from "azurajs/cors";
@@ -67,7 +67,7 @@ interface RequestServer {
 
 ```typescript
 import { Get, Req } from "azurajs/decorators";
-import type { RequestServer } from "azurajs";
+import type { RequestServer } from "azurajs/types";
 
 @Get("/profile")
 getProfile(@Req() req: RequestServer) {
@@ -339,7 +339,7 @@ getUser(@Param("id") id: string): PublicUser {
 Tipagem completa para middleware:
 
 ```typescript
-import type { RequestServer, ResponseServer } from "azurajs";
+import type { RequestServer, ResponseServer } from "azurajs/types";
 import type { RequestHandler } from "azurajs/types";
 
 const authMiddleware: RequestHandler = (req, res, next) => {

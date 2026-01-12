@@ -90,7 +90,7 @@ Create controller with decorators in `src/controllers/UserController.ts`:
 
 ```typescript title="src/controllers/UserController.ts"
 import { Controller, Get, Post, Put, Delete, Body, Param, Res } from "azurajs/decorators";
-import type { ResponseServer } from "azurajs";
+import type { ResponseServer } from "azurajs/types";
 
 // In-memory database (for demo purposes)
 const users = [

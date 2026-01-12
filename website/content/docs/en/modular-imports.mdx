@@ -42,7 +42,7 @@ import { createLoggingMiddleware } from "azurajs/middleware";
 Import TypeScript types:
 
 ```typescript
-import type { RequestServer, ResponseServer } from "azurajs";
+import type { RequestServer, ResponseServer } from "azurajs/types";
 // Or use modular import
 import type { ConfigTypes } from "azurajs/config";
 ```
@@ -103,7 +103,7 @@ import { createLoggingMiddleware } from "azurajs/middleware";
 import { HttpError } from "azurajs/http-error";
 
 // Types
-import type { ResponseServer } from "azurajs";
+import type { ResponseServer } from "azurajs/types";
 import type { ConfigTypes } from "azurajs/config";
 
 @Controller("/users")
@@ -179,9 +179,10 @@ app.listen(3000);
 
 ## Import Comparison
 
-### Before (Bundle everything)
+### Before (❌ No longer works)
 
 ```typescript
+// This example does NOT work anymore in version 2.4.0+
 import {
   AzuraClient,
   Controller,
@@ -197,12 +198,15 @@ import {
 
 **Bundle size:** ~50KB (everything included)
 
-### After (Modular imports)
+### After (✅ Correct - Modular imports)
 
 ```typescript
 import { AzuraClient } from "azurajs";
 import { Controller, Get, Post, Body } from "azurajs/decorators";
 import { HttpError } from "azurajs/http-error";
+import { logger } from "azurajs/logger";
+import { cors } from "azurajs/cors";
+import { rateLimit } from "azurajs/rate-limit";
 ```
 
 **Bundle size:** ~15KB (only what you need)
@@ -212,27 +216,27 @@ import { HttpError } from "azurajs/http-error";
 If you're using older imports, here's how to migrate:
 
 ```typescript
-// Old way
+// ❌ Old way (no longer works)
 import { validateDto } from "azurajs";
 
-// New way (recommended)
+// ✅ New way (correct)
 import { validateDto } from "azurajs/validators";
 
-// Old way
+// ❌ Old way (no longer works)
 import { HttpError } from "azurajs";
 
-// New way (recommended)
+// ✅ New way (correct)
 import { HttpError } from "azurajs/http-error";
 
-// Old way
+// ❌ Old way (no longer works)
 import { cors } from "azurajs";
 
-// New way (recommended)
+// ✅ New way (correct)
 import { cors } from "azurajs/cors";
 ```
 
-<Callout type="info">
-  **Both ways work!** The main package re-exports everything for convenience, but modular imports are recommended for production builds.
+<Callout type="warn">
+  **Important!** Starting from version 2.4.0, you MUST use modular imports. The main package (`azurajs`) only exports `AzuraClient`, `applyDecorators`, and basic types. Specific features like logger, validators, http-error, cors, etc. must be imported from their respective modules.
 </Callout>
 
 ## Available Modules

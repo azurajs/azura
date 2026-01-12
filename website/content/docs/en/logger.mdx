@@ -11,7 +11,7 @@ AzuraJS includes a powerful logging system with support for colors, icons, times
 ## Quick Start 🚀
 
 ```typescript
-import { log } from 'azurajs';
+import { log } from 'azurajs/logger';
 
 log.info('Server started on port 3000');
 log.success('Task completed successfully');
@@ -41,7 +41,7 @@ log.log('General log');                // 📝 White
 Configure logger globally for all subsequent calls:
 
 ```typescript
-import { configureLogger } from 'azurajs';
+import { configureLogger } from 'azurajs/logger';
 
 configureLogger({
   showTimestamp: true,
@@ -251,7 +251,7 @@ apiLogger('Server started');         // [API:INFO] ℹ️ Server started
 ### Using Raw Logger Function
 
 ```typescript
-import { logger } from 'azurajs';
+import { logger } from 'azurajs/logger';
 
 logger('info', 'Custom log', {
   showTimestamp: true,
@@ -264,7 +264,7 @@ logger('info', 'Custom log', {
 Access color functions directly:
 
 ```typescript
-import { colors } from 'azurajs';
+import { colors } from 'azurajs/logger';
 
 // Convert hex to ANSI
 const greenAnsi = colors.hex('#00ff00');
