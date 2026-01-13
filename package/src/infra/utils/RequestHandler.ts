@@ -1,7 +1,7 @@
 import type { RequestServer } from "../../types/http/request.type";
 import type { ResponseServer } from "../../types/http/response.type";
 
-type NextFunction = (err?: Error | unknown) => Promise<void>;
+export type NextFunction = (err?: Error | unknown) => Promise<void>;
 
 interface AdapterContext {
   request?: RequestServer;
