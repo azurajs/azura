@@ -1,7 +1,6 @@
 {
-  "name": "website",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@azurajs/website",
+  "version": "0.1.0",
   "scripts": {
     "build": "next build",
     "dev": "next dev",
