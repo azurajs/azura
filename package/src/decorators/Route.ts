@@ -6,10 +6,24 @@ import type { ParamDefinition, ParamSource, RouteDefinition } from "../types/rou
 const PREFIX = new WeakMap<Function, string>();
 const ROUTES = new WeakMap<Function, RouteDefinition[]>();
 const PARAMS = new WeakMap<Function, Map<string, ParamDefinition[]>>();
+const DESCRIPTIONS = new WeakMap<Function, Map<string, string>>();
 
 export function Controller(prefix = ""): ClassDecorator {
   return (target) => {
     PREFIX.set(target as Function, prefix);
+  };
+}
+
+export function Description(description: string): MethodDecorator {
+  return (target, propertyKey) => {
+    const ctor =
+      typeof target === "function" ? (target as Function) : (target as any).constructor;
+    let map = DESCRIPTIONS.get(ctor);
+    if (!map) {
+      map = new Map<string, string>();
+      DESCRIPTIONS.set(ctor, map);
+    }
+    map.set(String(propertyKey), description);
   };
 }
 
@@ -21,6 +35,7 @@ function createMethodDecorator(method: string) {
       const key = String(propertyKey);
       const routes = ROUTES.get(ctor) ?? [];
       const params = PARAMS.get(ctor)?.get(key) ?? [];
+      const description = DESCRIPTIONS.get(ctor)?.get(key);
 
       const exists = routes.some(
         (r) => r.method === method && r.path === path && r.propertyKey === key
@@ -31,6 +46,7 @@ function createMethodDecorator(method: string) {
           path,
           propertyKey: key,
           params,
+          description,
         });
         ROUTES.set(ctor, routes);
       }
