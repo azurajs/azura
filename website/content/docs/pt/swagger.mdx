@@ -1,0 +1,615 @@
+---
+title: Swagger / OpenAPI
+description: Documentação completa de API com interface moderna e interativa
+---
+
+import { Callout, Steps, Tabs, Tab } from 'fumadocs-ui/components';
+
+# Swagger / OpenAPI 3.0
+
+AzuraJS inclui suporte completo para documentação de API usando Swagger/OpenAPI 3.0, com uma interface moderna dark mode e funcionalidade "Try It Out" integrada.
+
+<Callout type="info">
+  O sistema Swagger do AzuraJS gera automaticamente documentação OpenAPI 3.0 a partir dos seus controllers e decorators, sem configuração manual.
+</Callout>
+
+## Instalação
+
+O Swagger já vem incluído no AzuraJS. Basta importar do submódulo `azurajs/swagger`:
+
+```typescript
+import { setupSwaggerWithControllers } from "azurajs/swagger";
+```
+
+## Setup Rápido
+
+A forma mais simples de adicionar Swagger à sua aplicação é com uma linha:
+
+<Tabs items={['TypeScript', 'JavaScript']}>
+  <Tab value="TypeScript">
+    ```typescript
+    import { AzuraClient } from "azurajs";
+    import { setupSwaggerWithControllers } from "azurajs/swagger";
+    import { UserController } from "./controllers/UserController";
+
+    const app = new AzuraClient();
+
+    // Uma linha para configurar tudo!
+    setupSwaggerWithControllers(app, {
+      title: "My API",
+      description: "API documentation",
+      version: "1.0.0"
+    }, [UserController]);
+
+    app.listen();
+    ```
+  </Tab>
+  
+  <Tab value="JavaScript">
+    ```javascript
+    const { AzuraClient } = require("azurajs");
+    const { setupSwaggerWithControllers } = require("azurajs/swagger");
+    const { UserController } = require("./controllers/UserController");
+
+    const app = new AzuraClient();
+
+    setupSwaggerWithControllers(app, {
+      title: "My API",
+      description: "API documentation",
+      version: "1.0.0"
+    }, [UserController]);
+
+    app.listen();
+    ```
+  </Tab>
+</Tabs>
+
+<Callout type="success">
+  Acesse a documentação em:
+  - **UI Interativa:** `http://localhost:3000/docs`
+  - **OpenAPI JSON:** `http://localhost:3000/api-spec.json`
+</Callout>
+
+## Decorators de Documentação
+
+### @ApiDoc()
+
+Documenta informações básicas do endpoint:
+
+```typescript
+import { Controller, Get } from "azurajs/decorators";
+import { ApiDoc } from "azurajs/swagger";
+
+@Controller("/users")
+class UserController {
+  @Get("/:id")
+  @ApiDoc({
+    summary: "Get user by ID",
+    description: "Retrieve detailed information about a specific user"
+  })
+  async getUser(@Req() req, @Res() res) {
+    res.json({ id: req.params.id, name: "John Doe" });
+  }
+}
+```
+
+### @ApiResponse()
+
+Define as respostas possíveis do endpoint:
+
+```typescript
+@Get("/:id")
+@ApiResponse(200, "User found", {
+  example: { 
+    id: 1, 
+    name: "John Doe", 
+    email: "john@example.com" 
+  }
+})
+@ApiResponse(404, "User not found", {
+  example: { error: "User not found" }
+})
+async getUser(@Req() req, @Res() res) {
+  // ...
+}
+```
+
+### @ApiParameter()
+
+Documenta parâmetros da requisição:
+
+```typescript
+@Get("/:id")
+@ApiParameter("id", "path", {
+  description: "User ID",
+  required: true,
+  schema: { type: "integer" },
+  example: 123
+})
+async getUser(@Req() req, @Res() res) {
+  // ...
+}
+```
+
+**Tipos de parâmetros:**
+- `path` - Parâmetros na URL (`/users/:id`)
+- `query` - Query strings (`/users?page=1`)
+- `header` - Headers HTTP
+- `cookie` - Cookies
+
+### @ApiBody()
+
+Documenta o corpo da requisição:
+
+```typescript
+@Post("/")
+@ApiBody({
+  description: "User data",
+  required: true,
+  example: {
+    name: "Jane Doe",
+    email: "jane@example.com",
+    age: 25
+  }
+})
+async createUser(@Req() req, @Res() res) {
+  res.status(201).json(req.body);
+}
+```
+
+### @ApiTags()
+
+Organiza endpoints por tags:
+
+```typescript
+@Controller("/users")
+@ApiTags("Users")
+class UserController {
+  // Todos os endpoints terão a tag "Users"
+}
+
+// Ou em endpoints específicos:
+@Get("/")
+@ApiTags("Users", "Public")
+async listUsers() {
+  // ...
+}
+```
+
+### @ApiSecurity()
+
+Especifica requisitos de autenticação:
+
+```typescript
+@Get("/profile")
+@ApiSecurity("bearerAuth")
+async getProfile(@Req() req, @Res() res) {
+  // Endpoint protegido
+}
+```
+
+**Configurando security schemes:**
+
+```typescript
+setupSwaggerWithControllers(app, {
+  title: "My API",
+  version: "1.0.0",
+  securitySchemes: {
+    bearerAuth: {
+      type: "http",
+      scheme: "bearer",
+      bearerFormat: "JWT"
+    },
+    apiKey: {
+      type: "apiKey",
+      in: "header",
+      name: "X-API-Key"
+    }
+  }
+}, [UserController]);
+```
+
+### @ApiDeprecated()
+
+Marca endpoints como deprecados:
+
+```typescript
+@Get("/old-endpoint")
+@ApiDeprecated()
+@ApiDoc({ summary: "Old endpoint (use /new-endpoint instead)" })
+async oldEndpoint(@Req() req, @Res() res) {
+  // ...
+}
+```
+
+## Exemplo Completo
+
+```typescript
+import { Controller, Get, Post, Put, Delete, Req, Res } from "azurajs/decorators";
+import { 
+  ApiDoc, 
+  ApiResponse, 
+  ApiParameter, 
+  ApiBody, 
+  ApiTags 
+} from "azurajs/swagger";
+
+@Controller("/users")
+@ApiTags("Users")
+class UserController {
+  @Get("/")
+  @ApiDoc({
+    summary: "List all users",
+    description: "Retrieve a paginated list of users"
+  })
+  @ApiParameter("page", "query", {
+    description: "Page number",
+    schema: { type: "integer", default: 1 }
+  })
+  @ApiParameter("limit", "query", {
+    description: "Items per page",
+    schema: { type: "integer", default: 10 }
+  })
+  @ApiResponse(200, "Success", {
+    example: {
+      users: [
+        { id: 1, name: "John Doe" },
+        { id: 2, name: "Jane Doe" }
+      ],
+      total: 2,
+      page: 1
+    }
+  })
+  async listUsers(@Req() req, @Res() res) {
+    const page = req.query.page || 1;
+    const limit = req.query.limit || 10;
+    res.json({ users: [], total: 0, page });
+  }
+
+  @Get("/:id")
+  @ApiDoc({
+    summary: "Get user by ID",
+    description: "Retrieve detailed user information"
+  })
+  @ApiParameter("id", "path", {
+    description: "User ID",
+    required: true,
+    schema: { type: "integer" }
+  })
+  @ApiResponse(200, "User found", {
+    example: { id: 1, name: "John Doe", email: "john@example.com" }
+  })
+  @ApiResponse(404, "User not found")
+  async getUser(@Req() req, @Res() res) {
+    const userId = req.params.id;
+    res.json({ id: userId, name: "John Doe" });
+  }
+
+  @Post("/")
+  @ApiDoc({
+    summary: "Create new user",
+    description: "Create a new user in the system"
+  })
+  @ApiBody({
+    description: "User data",
+    required: true,
+    example: {
+      name: "Jane Doe",
+      email: "jane@example.com",
+      age: 25
+    }
+  })
+  @ApiResponse(201, "User created", {
+    example: { id: 3, name: "Jane Doe", email: "jane@example.com" }
+  })
+  @ApiResponse(400, "Invalid data")
+  async createUser(@Req() req, @Res() res) {
+    res.status(201).json({ id: 3, ...req.body });
+  }
+
+  @Put("/:id")
+  @ApiDoc({ summary: "Update user" })
+  @ApiParameter("id", "path", {
+    description: "User ID",
+    required: true,
+    schema: { type: "integer" }
+  })
+  @ApiBody({
+    description: "Updated user data",
+    example: { name: "John Updated" }
+  })
+  @ApiResponse(200, "User updated")
+  @ApiResponse(404, "User not found")
+  async updateUser(@Req() req, @Res() res) {
+    res.json({ id: req.params.id, ...req.body });
+  }
+
+  @Delete("/:id")
+  @ApiDoc({ summary: "Delete user" })
+  @ApiParameter("id", "path", {
+    description: "User ID",
+    required: true
+  })
+  @ApiResponse(204, "User deleted")
+  @ApiResponse(404, "User not found")
+  async deleteUser(@Req() req, @Res() res) {
+    res.status(204).send();
+  }
+}
+```
+
+## Interface Swagger UI
+
+A interface Swagger do AzuraJS oferece:
+
+### 🎨 Design Moderno
+- Dark mode premium (inspirado em Stripe/Vercel)
+- Sidebar com navegação por tags
+- Cards expansíveis para cada endpoint
+- Syntax highlighting para código
+
+### 🔍 Busca em Tempo Real
+- Pesquise endpoints por método ou path
+- Filtragem instantânea na sidebar
+
+### 🚀 Try It Out
+- Teste endpoints diretamente na UI
+- Preencha parâmetros, query strings e body
+- Veja a resposta em tempo real
+- Exibe tempo de resposta
+
+### 📋 Funcionalidades
+- Copiar código com um clique
+- Visualização de status codes
+- Exemplos de request/response
+- Documentação de tipos
+- Badges para required/deprecated
+
+## Configuração Avançada
+
+### Múltiplos Servidores
+
+```typescript
+setupSwaggerWithControllers(app, {
+  title: "My API",
+  version: "1.0.0",
+  servers: [
+    {
+      url: "http://localhost:3000",
+      description: "Development"
+    },
+    {
+      url: "https://api.example.com",
+      description: "Production"
+    },
+    {
+      url: "https://staging.example.com",
+      description: "Staging"
+    }
+  ]
+}, [UserController]);
+```
+
+### Security Schemes
+
+```typescript
+setupSwaggerWithControllers(app, {
+  title: "My API",
+  version: "1.0.0",
+  securitySchemes: {
+    bearerAuth: {
+      type: "http",
+      scheme: "bearer",
+      bearerFormat: "JWT",
+      description: "JWT token from /auth/login"
+    },
+    apiKey: {
+      type: "apiKey",
+      in: "header",
+      name: "X-API-Key",
+      description: "API key from dashboard"
+    },
+    oauth2: {
+      type: "oauth2",
+      flows: {
+        authorizationCode: {
+          authorizationUrl: "https://example.com/oauth/authorize",
+          tokenUrl: "https://example.com/oauth/token",
+          scopes: {
+            "read:users": "Read user data",
+            "write:users": "Modify user data"
+          }
+        }
+      }
+    }
+  }
+}, [UserController]);
+```
+
+### Contact & License
+
+```typescript
+setupSwaggerWithControllers(app, {
+  title: "My API",
+  description: "Complete API documentation",
+  version: "1.0.0",
+  contact: {
+    name: "API Support",
+    email: "support@example.com",
+    url: "https://example.com/support"
+  },
+  license: {
+    name: "MIT",
+    url: "https://opensource.org/licenses/MIT"
+  }
+}, [UserController]);
+```
+
+## Setup Manual (Avançado)
+
+Se você precisa de mais controle, pode configurar manualmente:
+
+```typescript
+import { AzuraClient } from "azurajs";
+import { SwaggerIntegration, SwaggerGenerator } from "azurajs/swagger";
+import { getControllerMetadata } from "azurajs/decorators";
+
+const app = new AzuraClient();
+
+// Criar gerador
+const generator = new SwaggerGenerator({
+  title: "My API",
+  version: "1.0.0"
+});
+
+// Adicionar controllers
+const metadata = getControllerMetadata(UserController);
+generator.addController(metadata.prefix, metadata.routes);
+
+// Configurar rotas Swagger
+const swagger = new SwaggerIntegration(generator, {
+  title: "My API",
+  version: "1.0.0"
+});
+
+app.use("/docs", swagger.getUIRoute());
+app.use("/api-spec.json", swagger.getSpecRoute());
+
+// Registrar controllers normalmente
+app.registerController(UserController);
+
+app.listen();
+```
+
+## TypeScript Types
+
+O AzuraJS fornece types completos para OpenAPI 3.0:
+
+```typescript
+import type {
+  OpenAPIDocument,
+  SwaggerConfig,
+  ApiDocMetadata,
+  ApiResponseMetadata,
+  ParameterObject,
+  SchemaObject
+} from "azurajs/swagger";
+
+const config: SwaggerConfig = {
+  title: "My API",
+  version: "1.0.0",
+  servers: [{ url: "http://localhost:3000" }]
+};
+```
+
+## Boas Práticas
+
+<Steps>
+### Use @ApiTags para Organização
+
+Agrupe endpoints relacionados com tags:
+
+```typescript
+@Controller("/users")
+@ApiTags("Users", "Management")
+class UserController { }
+
+@Controller("/products")
+@ApiTags("Products", "E-commerce")
+class ProductController { }
+```
+
+### Forneça Exemplos Detalhados
+
+Exemplos ajudam desenvolvedores a entender o formato esperado:
+
+```typescript
+@ApiBody({
+  description: "User registration data",
+  example: {
+    name: "John Doe",
+    email: "john@example.com",
+    password: "secure123",
+    preferences: {
+      newsletter: true,
+      notifications: ["email", "push"]
+    }
+  }
+})
+```
+
+### Documente Todos os Status Codes
+
+Inclua todas as respostas possíveis:
+
+```typescript
+@ApiResponse(200, "Success")
+@ApiResponse(400, "Bad request")
+@ApiResponse(401, "Unauthorized")
+@ApiResponse(403, "Forbidden")
+@ApiResponse(404, "Not found")
+@ApiResponse(500, "Server error")
+```
+
+### Use Descriptions Claras
+
+Seja descritivo nas summaries e descriptions:
+
+```typescript
+@ApiDoc({
+  summary: "Update user profile",
+  description: "Updates the authenticated user's profile information. Only provided fields will be updated. Requires valid JWT token."
+})
+```
+
+### Marque Endpoints Deprecados
+
+Informe quando endpoints estão deprecados:
+
+```typescript
+@Get("/old-api")
+@ApiDeprecated()
+@ApiDoc({
+  summary: "Legacy API endpoint",
+  description: "⚠️ Deprecated: Use /api/v2/endpoint instead. This endpoint will be removed in v3.0.0"
+})
+```
+</Steps>
+
+## Troubleshooting
+
+### Documentação não aparece
+
+Certifique-se de que:
+1. Você importou os decorators de `azurajs/swagger`
+2. Os decorators estão aplicados nos métodos
+3. Os controllers foram passados para `setupSwaggerWithControllers()`
+
+### Try It Out não funciona
+
+Verifique:
+1. CORS está configurado corretamente
+2. O servidor está rodando na URL esperada
+3. Os parâmetros estão sendo preenchidos corretamente
+
+### Tipos TypeScript não funcionam
+
+Certifique-se de importar os types:
+
+```typescript
+import type { SwaggerConfig } from "azurajs/swagger";
+```
+
+## Próximos Passos
+
+<Cards>
+  <Card title="Exemplos" href="/docs/examples">
+    Veja exemplos completos de uso
+  </Card>
+  <Card title="Decorators" href="/docs/decorators">
+    Aprenda mais sobre decorators
+  </Card>
+  <Card title="Controllers" href="/docs/controllers">
+    Entenda como controllers funcionam
+  </Card>
+</Cards>

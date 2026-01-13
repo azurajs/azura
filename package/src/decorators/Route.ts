@@ -155,3 +155,16 @@ export function applyDecorators(app: AzuraClient, controllers: Array<new () => a
     });
   });
 }
+
+/**
+ * Get routes metadata from a controller class
+ * @internal Used by Swagger integration
+ */
+export function getControllerMetadata(ControllerClass: Function) {
+  return {
+    prefix: PREFIX.get(ControllerClass) || "",
+    routes: ROUTES.get(ControllerClass) || [],
+    params: PARAMS.get(ControllerClass),
+    descriptions: DESCRIPTIONS.get(ControllerClass),
+  };
+}

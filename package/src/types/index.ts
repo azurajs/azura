@@ -13,3 +13,6 @@ export type * from "./validators.type";
 
 // Export cookie types
 export type * from "./cookies.type";
+
+// Export Swagger types
+export type * from "./swagger.type";

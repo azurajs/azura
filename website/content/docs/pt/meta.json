@@ -21,6 +21,7 @@
     "proxy",
     "cluster-mode",
     "error-handling",
+    "swagger",
     "---Avançado---",
     "custom-servers",
     "type-extensions",

@@ -17,6 +17,7 @@ export default defineConfig({
     validators: 'src/utils/validators/index.ts',
     logger: 'src/utils/Logger.ts',
     'http-error': 'src/infra/utils/HttpError.ts',
+    swagger: 'src/swagger.ts',
   },
 
   // Formatos de saída: ESM (modules) e CJS (CommonJS)

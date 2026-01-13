@@ -36,7 +36,7 @@ export default function HomePage() {
         <div className="max-w-5xl mx-auto text-center space-y-8">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium uppercase tracking-wider">
             <Sparkles size={12} />
-            v2.4.1 is now available
+            v2.5 is now available
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white leading-[1.1]">
