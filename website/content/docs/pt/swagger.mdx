@@ -3,15 +3,11 @@ title: Swagger / OpenAPI
 description: Documentação completa de API com interface moderna e interativa
 ---
 
-import { Callout, Steps, Tabs, Tab } from 'fumadocs-ui/components';
-
 # Swagger / OpenAPI 3.0
 
 AzuraJS inclui suporte completo para documentação de API usando Swagger/OpenAPI 3.0, com uma interface moderna dark mode e funcionalidade "Try It Out" integrada.
 
-<Callout type="info">
-  O sistema Swagger do AzuraJS gera automaticamente documentação OpenAPI 3.0 a partir dos seus controllers e decorators, sem configuração manual.
-</Callout>
+> **Nota:** O sistema Swagger do AzuraJS gera automaticamente documentação OpenAPI 3.0 a partir dos seus controllers e decorators, sem configuração manual.
 
 ## Instalação
 
@@ -25,50 +21,26 @@ import { setupSwaggerWithControllers } from "azurajs/swagger";
 
 A forma mais simples de adicionar Swagger à sua aplicação é com uma linha:
 
-<Tabs items={['TypeScript', 'JavaScript']}>
-  <Tab value="TypeScript">
-    ```typescript
-    import { AzuraClient } from "azurajs";
-    import { setupSwaggerWithControllers } from "azurajs/swagger";
-    import { UserController } from "./controllers/UserController";
+```typescript
+import { AzuraClient } from "azurajs";
+import { setupSwaggerWithControllers } from "azurajs/swagger";
+import { UserController } from "./controllers/UserController";
 
-    const app = new AzuraClient();
+const app = new AzuraClient();
 
-    // Uma linha para configurar tudo!
-    setupSwaggerWithControllers(app, {
-      title: "My API",
-      description: "API documentation",
-      version: "1.0.0"
-    }, [UserController]);
+// Uma linha para configurar tudo!
+setupSwaggerWithControllers(app, {
+  title: "My API",
+  description: "API documentation",
+  version: "1.0.0"
+}, [UserController]);
 
-    app.listen();
-    ```
-  </Tab>
-  
-  <Tab value="JavaScript">
-    ```javascript
-    const { AzuraClient } = require("azurajs");
-    const { setupSwaggerWithControllers } = require("azurajs/swagger");
-    const { UserController } = require("./controllers/UserController");
+app.listen();
+```
 
-    const app = new AzuraClient();
-
-    setupSwaggerWithControllers(app, {
-      title: "My API",
-      description: "API documentation",
-      version: "1.0.0"
-    }, [UserController]);
-
-    app.listen();
-    ```
-  </Tab>
-</Tabs>
-
-<Callout type="success">
-  Acesse a documentação em:
-  - **UI Interativa:** `http://localhost:3000/docs`
-  - **OpenAPI JSON:** `http://localhost:3000/api-spec.json`
-</Callout>
+> **Acesse a documentação em:**
+> - **UI Interativa:** `http://localhost:3000/docs`
+> - **OpenAPI JSON:** `http://localhost:3000/api-spec.json`
 
 ## Decorators de Documentação
 
@@ -504,8 +476,7 @@ const config: SwaggerConfig = {
 
 ## Boas Práticas
 
-<Steps>
-### Use @ApiTags para Organização
+### 1. Use @ApiTags para Organização
 
 Agrupe endpoints relacionados com tags:
 
@@ -519,7 +490,7 @@ class UserController { }
 class ProductController { }
 ```
 
-### Forneça Exemplos Detalhados
+### 2. Forneça Exemplos Detalhados
 
 Exemplos ajudam desenvolvedores a entender o formato esperado:
 
@@ -538,7 +509,7 @@ Exemplos ajudam desenvolvedores a entender o formato esperado:
 })
 ```
 
-### Documente Todos os Status Codes
+### 3. Documente Todos os Status Codes
 
 Inclua todas as respostas possíveis:
 
@@ -551,7 +522,7 @@ Inclua todas as respostas possíveis:
 @ApiResponse(500, "Server error")
 ```
 
-### Use Descriptions Claras
+### 4. Use Descriptions Claras
 
 Seja descritivo nas summaries e descriptions:
 
@@ -562,7 +533,7 @@ Seja descritivo nas summaries e descriptions:
 })
 ```
 
-### Marque Endpoints Deprecados
+### 5. Marque Endpoints Deprecados
 
 Informe quando endpoints estão deprecados:
 
@@ -574,7 +545,6 @@ Informe quando endpoints estão deprecados:
   description: "⚠️ Deprecated: Use /api/v2/endpoint instead. This endpoint will be removed in v3.0.0"
 })
 ```
-</Steps>
 
 ## Troubleshooting
 
@@ -602,14 +572,6 @@ import type { SwaggerConfig } from "azurajs/swagger";
 
 ## Próximos Passos
 
-<Cards>
-  <Card title="Exemplos" href="/docs/examples">
-    Veja exemplos completos de uso
-  </Card>
-  <Card title="Decorators" href="/docs/decorators">
-    Aprenda mais sobre decorators
-  </Card>
-  <Card title="Controllers" href="/docs/controllers">
-    Entenda como controllers funcionam
-  </Card>
-</Cards>
+- [Exemplos](/docs/examples) - Veja exemplos completos de uso
+- [Decorators](/docs/decorators) - Aprenda mais sobre decorators
+- [Controllers](/docs/controllers) - Entenda como controllers funcionam

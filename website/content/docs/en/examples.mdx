@@ -807,27 +807,9 @@ describe("Auth API", () => {
 
 ## Next Steps 📖
 
-<Cards>
-  <Card title="GitHub" href="https://github.com/0xviny/azurajs" description="Contribute on GitHub" />
-  <Card title="NPM" href="https://www.npmjs.com/package/azurajs" description="Install via NPM" />
-  <Card title="Documentation" href="/docs" description="Explore the full documentation" />
-</Cards>
-  const { q } = req.query;
-  
-  if (!q) {
-    throw new HttpError(400, "Search query required");
-  }
-  
-  const results = posts.filter(
-    (p) =>
-      p.title.toLowerCase().includes(q.toLowerCase()) ||
-      p.content.toLowerCase().includes(q.toLowerCase())
-  );
-  
-  res.json({ posts: results, query: q });
-});
-
-// Start server
+- [GitHub](https://github.com/0xviny/azurajs) - Contribute on GitHub
+- [NPM](https://www.npmjs.com/package/azurajs) - Install via NPM
+- [Documentation](/docs) - Explore the full documentation
 await app.listen();
 ```
 

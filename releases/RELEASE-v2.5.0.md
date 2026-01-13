@@ -207,9 +207,7 @@ bun add azurajs@2.5.0
 
 ## 🔗 Resources
 
-- **Documentation:** [docs/SWAGGER.md](../docs/SWAGGER.md)
-- **Quick Start:** [docs/SWAGGER_QUICKSTART.md](../docs/SWAGGER_QUICKSTART.md)
-- **Examples:** [examples/servers/swagger-simple.ts](../examples/servers/swagger-simple.ts)
+- **Documentation:** [azura.js.org](https://azura.js.org)
 - **Live Demo:** Run `bun run examples/servers/swagger-simple.ts` and visit `http://localhost:3000/docs`
 
 ## 🙏 Credits
