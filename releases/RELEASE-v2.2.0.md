@@ -128,8 +128,8 @@ No migration needed! This release is fully backward compatible. JavaScript suppo
 ## 🔗 Resources
 
 - [Documentation](https://azura.js.org/docs/en)
-- [JavaScript Examples](https://github.com/0xviny/azurajs/tree/main/examples)
-- [GitHub Repository](https://github.com/0xviny/azurajs)
+- [JavaScript Examples](https://github.com/azurajs/azura/tree/main/examples)
+- [GitHub Repository](https://github.com/azurajs/azura)
 - [NPM Package](https://www.npmjs.com/package/azurajs)
 
 ## 🙏 Acknowledgments
@@ -146,6 +146,6 @@ None. This is a minor version bump with new features only.
 
 ---
 
-**Full Changelog**: https://github.com/0xviny/azurajs/compare/v2.1.2...v2.2.0
+**Full Changelog**: https://github.com/azurajs/azura/compare/v2.1.2...v2.2.0
 
 **Install**: `npm install azurajs@2.2.0`

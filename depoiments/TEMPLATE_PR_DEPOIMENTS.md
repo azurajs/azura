@@ -72,7 +72,7 @@ Obrigado por querer compartilhar sua experiência com AzuraJS! 🎉
 
 ## Precisa de ajuda?
 
-Se tiver alguma dúvida, abra uma [issue](https://github.com/0xviny/azurajs/issues) ou entre em contato!
+Se tiver alguma dúvida, abra uma [issue](https://github.com/azurajs/azura/issues) ou entre em contato!
 
 ---
 

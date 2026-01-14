@@ -119,9 +119,9 @@ pnpm add azurajs@2.1.0
 ## 🔗 Links Úteis
 
 - [Documentação Completa](https://azura.js.org/)
-- [GitHub Repository](https://github.com/0xviny/azurajs)
+- [GitHub Repository](https://github.com/azurajs/azura)
 - [NPM Package](https://www.npmjs.com/package/azurajs)
 
 ---
 
-**Full Changelog**: https://github.com/0xviny/azurajs/compare/v2.0.1...v2.1.0
+**Full Changelog**: https://github.com/azurajs/azura/compare/v2.0.1...v2.1.0

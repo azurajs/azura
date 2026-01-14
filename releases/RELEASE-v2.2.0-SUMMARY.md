@@ -154,9 +154,9 @@ await app.listen(3000);
 
 - **NPM Package:** https://www.npmjs.com/package/azurajs
 - **Documentation:** https://azura.js.org/docs/en
-- **GitHub Repository:** https://github.com/0xviny/azurajs
+- **GitHub Repository:** https://github.com/azurajs/azura
 - **Discord Community:** https://discord.gg/gr63YzEYfp
-- **Examples:** https://github.com/0xviny/azurajs/tree/main/examples
+- **Examples:** https://github.com/azurajs/azura/tree/main/examples
 
 ## 🎊 Impact
 
@@ -192,4 +192,4 @@ npm install azurajs@latest
 
 **Questions?** Join our [Discord](https://discord.gg/gr63YzEYfp)
 
-**Found a bug?** [Open an issue](https://github.com/0xviny/azurajs/issues)
+**Found a bug?** [Open an issue](https://github.com/azurajs/azura/issues)

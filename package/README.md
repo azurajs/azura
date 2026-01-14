@@ -3,7 +3,7 @@
 ⚡ Modern, fast, and TypeScript-first web framework for Node.js and Bun with decorator-based routing.
 
 [![NPM Version](https://img.shields.io/npm/v/azurajs)](https://www.npmjs.com/package/azurajs)
-[![License](https://img.shields.io/npm/l/azurajs)](https://github.com/0xviny/azurajs/blob/main/LICENSE)
+[![License](https://img.shields.io/npm/l/azurajs)](https://github.com/azurajs/azura/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue)](https://www.typescriptlang.org/)
 
 ## Features
@@ -817,13 +817,13 @@ MIT License - see LICENSE file for details
 
 ## Links
 
-- [GitHub Repository](https://github.com/0xviny/azurajs)
+- [GitHub Repository](https://github.com/azurajs/azura)
 - [NPM Package](https://www.npmjs.com/package/azurajs)
 - [Documentation](https://azura.js.org/docs/en)
-- [Examples](https://github.com/0xviny/azurajs/tree/main/examples)
+- [Examples](https://github.com/azurajs/azura/tree/main/examples)
 
 ## Support
 
-- 🐛 [Issue Tracker](https://github.com/0xviny/azurajs/issues)
-- 💬 [Discussions](https://github.com/0xviny/azurajs/discussions)
+- 🐛 [Issue Tracker](https://github.com/azurajs/azura/issues)
+- 💬 [Discussions](https://github.com/azurajs/azura/discussions)
 - 📧 Email: 0xviny.dev@gmail.com

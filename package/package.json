@@ -187,12 +187,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/0xviny/azurajs.git"
+    "url": "git+https://github.com/azurajs/azura.git"
   },
   "bugs": {
-    "url": "https://github.com/0xviny/azurajs/issues"
+    "url": "https://github.com/azurajs/azura/issues"
   },
-  "homepage": "https://github.com/0xviny/azurajs#readme",
+  "homepage": "https://github.com/azurajs/azura#readme",
   "engines": {
     "node": ">=18.0.0",
     "bun": ">=1.0.0"

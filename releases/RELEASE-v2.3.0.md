@@ -310,8 +310,8 @@ app.use("/admin", adminRouter);
 - [Documentation - Proxy (EN)](https://azura.js.org/docs/en/proxy)
 - [Documentation - Routing (PT)](https://azura.js.org/docs/pt/routing#router-com-prefix)
 - [Documentation - Routing (EN)](https://azura.js.org/docs/en/routing#router-with-prefix)
-- [Complete Examples](https://github.com/0xviny/azurajs/tree/main/examples/servers)
-- [GitHub Repository](https://github.com/0xviny/azurajs)
+- [Complete Examples](https://github.com/azurajs/azura/tree/main/examples/servers)
+- [GitHub Repository](https://github.com/azurajs/azura)
 - [NPM Package](https://www.npmjs.com/package/azurajs)
 
 ## 🙏 Acknowledgments
@@ -329,7 +329,7 @@ Planned for v2.4.0:
 
 ---
 
-**Full Changelog**: [https://github.com/0xviny/azurajs/compare/v2.2.0...v2.3.0](https://github.com/0xviny/azurajs/compare/v2.2.0...v2.3.0)
+**Full Changelog**: [https://github.com/azurajs/azura/compare/v2.2.0...v2.3.0](https://github.com/azurajs/azura/compare/v2.2.0...v2.3.0)
 
 **Install**: `npm install azurajs@2.3.0`
 

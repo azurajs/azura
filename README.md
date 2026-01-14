@@ -8,7 +8,7 @@
 
 [![NPM Version](https://img.shields.io/npm/v/azurajs)](https://www.npmjs.com/package/azurajs)
 [![NPM Downloads](https://img.shields.io/npm/dm/azurajs)](https://www.npmjs.com/package/azurajs)
-[![License](https://img.shields.io/npm/l/azurajs)](https://github.com/0xviny/azurajs/blob/main/LICENSE)
+[![License](https://img.shields.io/npm/l/azurajs)](https://github.com/azurajs/azura/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue)](https://www.typescriptlang.org/)
 [![Bundle Size](https://img.shields.io/bundlephobia/minzip/azurajs)](https://bundlephobia.com/result?p=azurajs)
 [![Discord](https://img.shields.io/discord/1459038905667162223?label=Discord&logo=Discord)](https://discord.gg/gr63YzEYfp)
@@ -163,7 +163,7 @@ For more details, see [CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ## Contributors
 
-Thanks to [all contributors](https://github.com/0xviny/azurajs/graphs/contributors) who help make AzuraJS better!
+Thanks to [all contributors](https://github.com/azurajs/azura/graphs/contributors) who help make AzuraJS better!
 
 ## Author
 

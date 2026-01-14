@@ -613,8 +613,8 @@ Special thanks to:
 ## 🔗 Links
 
 - 📚 [Full Documentation](https://azurajs.com/docs)
-- 🐛 [Report Issues](https://github.com/0xviny/azurajs/issues)
-- 💬 [Discussions](https://github.com/0xviny/azurajs/discussions)
+- 🐛 [Report Issues](https://github.com/azurajs/azura/issues)
+- 💬 [Discussions](https://github.com/azurajs/azura/discussions)
 - 📦 [npm Package](https://www.npmjs.com/package/azurajs)
 
 ---

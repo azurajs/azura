@@ -209,7 +209,7 @@ curl "http://localhost:3000/search?q=typescript&page=2"
 
     <div class="section">
       <h2>📖 Documentation</h2>
-      <p>Visit the <a href="https://github.com/0xviny/azurajs" target="_blank">GitHub repository</a> for complete documentation, examples, and guides.</p>
+      <p>Visit the <a href="https://github.com/azurajs/azura" target="_blank">GitHub repository</a> for complete documentation, examples, and guides.</p>
     </div>
   </div>
 </body>

@@ -555,8 +555,8 @@ Check out the `examples/` directory in the repository for more complete examples
 
 ## Getting Help
 
-- 📚 [Documentation](https://github.com/0xviny/azurajs)
-- 🐛 [Report Issues](https://github.com/0xviny/azurajs/issues)
-- 💬 [Discussions](https://github.com/0xviny/azurajs/discussions)
+- 📚 [Documentation](https://github.com/azurajs/azura)
+- 🐛 [Report Issues](https://github.com/azurajs/azura/issues)
+- 💬 [Discussions](https://github.com/azurajs/azura/discussions)
 
 Happy coding! 🚀
