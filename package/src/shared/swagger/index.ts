@@ -36,7 +36,7 @@ export class SwaggerIntegration {
       try {
         const currentDir = getCurrentDir();
         const htmlPath = normalize(
-          join(currentDir, "..", "shared", "swagger", "swagger-ui-modern.html")
+          join(currentDir, "..", "dist", "shared", "swagger", "swagger-ui-modern.html")
         );
 
         if (!existsSync(htmlPath)) {
