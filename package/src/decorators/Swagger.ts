@@ -8,21 +8,19 @@ import type {
   Header,
 } from "../types/swagger.type";
 
-const API_METADATA = new WeakMap<Function, Map<string, ApiDocMetadata>>();
-const API_RESPONSES = new WeakMap<Function, Map<string, ApiResponseMetadata[]>>();
-const API_PARAMETERS = new WeakMap<Function, Map<string, ApiParameterMetadata[]>>();
-const API_BODY = new WeakMap<Function, Map<string, ApiBodyMetadata>>();
-const API_TAGS = new WeakMap<Function, string[]>();
+const AZURA_SWAGGER = {
+  META: "__azura_api_metadata__",
+  RESP: "__azura_api_responses__",
+  PARAMS: "__azura_api_parameters__",
+  BODY: "__azura_api_body__",
+  TAGS: "__azura_api_tags__",
+};
 
 export function ApiDoc(metadata: Omit<ApiDocMetadata, "method" | "path">): MethodDecorator {
   return (target, propertyKey) => {
-    const ctor = typeof target === "function" ? (target as Function) : (target as any).constructor;
-    let map = API_METADATA.get(ctor);
-    if (!map) {
-      map = new Map<string, ApiDocMetadata>();
-      API_METADATA.set(ctor, map);
-    }
-    map.set(String(propertyKey), metadata);
+    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
+    if (!ctor[AZURA_SWAGGER.META]) ctor[AZURA_SWAGGER.META] = new Map<string, ApiDocMetadata>();
+    ctor[AZURA_SWAGGER.META].set(String(propertyKey), metadata);
   };
 }
 
@@ -36,14 +34,11 @@ export function ApiResponse(
   },
 ): MethodDecorator {
   return (target, propertyKey) => {
-    const ctor = typeof target === "function" ? (target as Function) : (target as any).constructor;
-    let map = API_RESPONSES.get(ctor);
-    if (!map) {
-      map = new Map<string, ApiResponseMetadata[]>();
-      API_RESPONSES.set(ctor, map);
-    }
+    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
+    if (!ctor[AZURA_SWAGGER.RESP])
+      ctor[AZURA_SWAGGER.RESP] = new Map<string, ApiResponseMetadata[]>();
     const key = String(propertyKey);
-    const responses = map.get(key) ?? [];
+    const responses = ctor[AZURA_SWAGGER.RESP].get(key) ?? [];
     responses.push({
       statusCode,
       description,
@@ -51,7 +46,7 @@ export function ApiResponse(
       examples: options?.examples,
       headers: options?.headers,
     });
-    map.set(key, responses);
+    ctor[AZURA_SWAGGER.RESP].set(key, responses);
   };
 }
 
@@ -67,14 +62,11 @@ export function ApiParameter(
   },
 ): MethodDecorator {
   return (target, propertyKey) => {
-    const ctor = typeof target === "function" ? (target as Function) : (target as any).constructor;
-    let map = API_PARAMETERS.get(ctor);
-    if (!map) {
-      map = new Map<string, ApiParameterMetadata[]>();
-      API_PARAMETERS.set(ctor, map);
-    }
+    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
+    if (!ctor[AZURA_SWAGGER.PARAMS])
+      ctor[AZURA_SWAGGER.PARAMS] = new Map<string, ApiParameterMetadata[]>();
     const key = String(propertyKey);
-    const params = map.get(key) ?? [];
+    const params = ctor[AZURA_SWAGGER.PARAMS].get(key) ?? [];
     params.push({
       name,
       in: paramIn,
@@ -84,7 +76,7 @@ export function ApiParameter(
       example: options?.example,
       schema: options?.schema,
     });
-    map.set(key, params);
+    ctor[AZURA_SWAGGER.PARAMS].set(key, params);
   };
 }
 
@@ -97,13 +89,9 @@ export function ApiBody(
   },
 ): MethodDecorator {
   return (target, propertyKey) => {
-    const ctor = typeof target === "function" ? (target as Function) : (target as any).constructor;
-    let map = API_BODY.get(ctor);
-    if (!map) {
-      map = new Map<string, ApiBodyMetadata>();
-      API_BODY.set(ctor, map);
-    }
-    map.set(String(propertyKey), {
+    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
+    if (!ctor[AZURA_SWAGGER.BODY]) ctor[AZURA_SWAGGER.BODY] = new Map<string, ApiBodyMetadata>();
+    ctor[AZURA_SWAGGER.BODY].set(String(propertyKey), {
       description,
       type: options?.type,
       required: options?.required,
@@ -114,45 +102,38 @@ export function ApiBody(
 
 export function ApiTags(...tags: string[]): ClassDecorator {
   return (target) => {
-    API_TAGS.set(target as Function, tags);
+    (target as any)[AZURA_SWAGGER.TAGS] = tags;
   };
 }
 
 export function ApiDeprecated(): MethodDecorator {
   return (target, propertyKey) => {
-    const ctor = typeof target === "function" ? (target as Function) : (target as any).constructor;
-    let map = API_METADATA.get(ctor);
-    if (!map) {
-      map = new Map<string, ApiDocMetadata>();
-      API_METADATA.set(ctor, map);
-    }
+    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
+    if (!ctor[AZURA_SWAGGER.META]) ctor[AZURA_SWAGGER.META] = new Map<string, ApiDocMetadata>();
     const key = String(propertyKey);
-    const existing = map.get(key) ?? {};
-    map.set(key, { ...existing, deprecated: true });
+    const existing = ctor[AZURA_SWAGGER.META].get(key) ?? {};
+    ctor[AZURA_SWAGGER.META].set(key, { ...existing, deprecated: true });
   };
 }
 
 export function ApiSecurity(...requirements: SecurityRequirement[]): MethodDecorator {
   return (target, propertyKey) => {
-    const ctor = typeof target === "function" ? (target as Function) : (target as any).constructor;
-    let map = API_METADATA.get(ctor);
-    if (!map) {
-      map = new Map<string, ApiDocMetadata>();
-      API_METADATA.set(ctor, map);
-    }
+    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
+    if (!ctor[AZURA_SWAGGER.META]) ctor[AZURA_SWAGGER.META] = new Map<string, ApiDocMetadata>();
     const key = String(propertyKey);
-    const existing = map.get(key) ?? {};
-    map.set(key, { ...existing, security: requirements });
+    const existing = ctor[AZURA_SWAGGER.META].get(key) ?? {};
+    ctor[AZURA_SWAGGER.META].set(key, { ...existing, security: requirements });
   };
 }
 
 export function getSwaggerMetadata(target: Function) {
+  const ctor = target as any;
   return {
-    metadata: API_METADATA.get(target),
-    responses: API_RESPONSES.get(target),
-    parameters: API_PARAMETERS.get(target),
-    body: API_BODY.get(target),
-    tags: API_TAGS.get(target),
+    metadata: ctor[AZURA_SWAGGER.META] ?? new Map<string, ApiDocMetadata>(),
+    responses: ctor[AZURA_SWAGGER.RESP] ?? new Map<string, ApiResponseMetadata[]>(),
+    parameters: ctor[AZURA_SWAGGER.PARAMS] ?? new Map<string, ApiParameterMetadata[]>(),
+    body: ctor[AZURA_SWAGGER.BODY] ?? new Map<string, ApiBodyMetadata>(),
+    tags: ctor[AZURA_SWAGGER.TAGS] ?? [],
   };
 }
 
@@ -188,17 +169,10 @@ export function Swagger(config: {
   >;
 }): MethodDecorator {
   return (target, propertyKey) => {
-    const ctor = typeof target === "function" ? (target as Function) : (target as any).constructor;
+    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
+    if (!ctor[AZURA_SWAGGER.META]) ctor[AZURA_SWAGGER.META] = new Map<string, ApiDocMetadata>();
     const key = String(propertyKey);
-
-    // Ensure metadata map exists so other decorators/readers always find it
-    let metaMap = API_METADATA.get(ctor);
-    if (!metaMap) {
-      metaMap = new Map<string, ApiDocMetadata>();
-      API_METADATA.set(ctor, metaMap);
-    }
-
-    const existingMeta = metaMap.get(key) ?? {};
+    const existingMeta = ctor[AZURA_SWAGGER.META].get(key) ?? {};
     const newMeta: ApiDocMetadata = {
       summary: config.summary ?? existingMeta.summary,
       description: config.description ?? existingMeta.description,
@@ -207,15 +181,11 @@ export function Swagger(config: {
       security: config.security ?? existingMeta.security,
       tags: config.tags ?? existingMeta.tags,
     };
-    metaMap.set(key, newMeta);
-
+    ctor[AZURA_SWAGGER.META].set(key, newMeta);
     if (config.parameters && config.parameters.length > 0) {
-      let paramMap = API_PARAMETERS.get(ctor);
-      if (!paramMap) {
-        paramMap = new Map<string, ApiParameterMetadata[]>();
-        API_PARAMETERS.set(ctor, paramMap);
-      }
-      const existingParams = paramMap.get(key) ?? [];
+      if (!ctor[AZURA_SWAGGER.PARAMS])
+        ctor[AZURA_SWAGGER.PARAMS] = new Map<string, ApiParameterMetadata[]>();
+      const existingParams = ctor[AZURA_SWAGGER.PARAMS].get(key) ?? [];
       const newParams = config.parameters.map((p) => ({
         name: p.name,
         in: p.in,
@@ -224,30 +194,21 @@ export function Swagger(config: {
         schema: p.schema,
         example: p.example,
       }));
-      paramMap.set(key, [...existingParams, ...newParams]);
+      ctor[AZURA_SWAGGER.PARAMS].set(key, [...existingParams, ...newParams]);
     }
-
     if (config.requestBody) {
-      let bodyMap = API_BODY.get(ctor);
-      if (!bodyMap) {
-        bodyMap = new Map<string, ApiBodyMetadata>();
-        API_BODY.set(ctor, bodyMap);
-      }
-      bodyMap.set(key, {
+      if (!ctor[AZURA_SWAGGER.BODY]) ctor[AZURA_SWAGGER.BODY] = new Map<string, ApiBodyMetadata>();
+      ctor[AZURA_SWAGGER.BODY].set(key, {
         description: config.requestBody.description,
         required: config.requestBody.required,
         type: config.requestBody.content,
         examples: config.requestBody.example ? { default: config.requestBody.example } : undefined,
       });
     }
-
     if (config.responses) {
-      let respMap = API_RESPONSES.get(ctor);
-      if (!respMap) {
-        respMap = new Map<string, ApiResponseMetadata[]>();
-        API_RESPONSES.set(ctor, respMap);
-      }
-      const existing = respMap.get(key) ?? [];
+      if (!ctor[AZURA_SWAGGER.RESP])
+        ctor[AZURA_SWAGGER.RESP] = new Map<string, ApiResponseMetadata[]>();
+      const existing = ctor[AZURA_SWAGGER.RESP].get(key) ?? [];
       const responses = Object.entries(config.responses).map(([code, resp]) => ({
         statusCode: Number(code),
         description: resp.description,
@@ -255,7 +216,7 @@ export function Swagger(config: {
         examples: resp.example ? { default: resp.example } : undefined,
         headers: resp.headers,
       }));
-      respMap.set(key, [...existing, ...responses]);
+      ctor[AZURA_SWAGGER.RESP].set(key, [...existing, ...responses]);
     }
   };
 }
