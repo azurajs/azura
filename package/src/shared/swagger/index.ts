@@ -2,14 +2,8 @@ import type { AzuraClient } from "../../infra/Server";
 import { SwaggerGenerator } from "./SwaggerGenerator";
 import type { SwaggerConfig } from "../../types/swagger.type";
 import { readFileSync, existsSync } from "node:fs";
-import { join, dirname, normalize } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { getControllerMetadata, applyDecorators } from "../../decorators/Route";
-
-function getCurrentDir(): string {
-  if (typeof __dirname !== "undefined") return __dirname;
-  return dirname(fileURLToPath(import.meta.url));
-}
 
 export class SwaggerIntegration {
   private generator: SwaggerGenerator;
@@ -23,21 +17,25 @@ export class SwaggerIntegration {
   public setup(): void {
     const config = this.generator.getConfig();
     if (!config.enabled) return;
+
     this.app.get(`/api-spec.json`, (_req: any, res: any) => {
       res.json(this.generator.getDocument());
     });
+
     this.app.get(config.path, (_req: any, res: any) => {
       try {
-        const currentDir = getCurrentDir();
-        const htmlPath = normalize(
-          join(currentDir, "..", "dist", "shared", "swagger", "swagger-ui-modern.html"),
-        );
+        const require = createRequire(import.meta.url);
+        const htmlPath = require.resolve("azurajs/dist/shared/swagger/swagger-ui-modern.html");
+
         if (!existsSync(htmlPath)) throw new Error(`Swagger UI HTML not found at ${htmlPath}`);
+
         let html = readFileSync(htmlPath, "utf-8");
         const doc = this.generator.getDocument();
+
         html = html.replace(/{{TITLE}}/g, String(doc.info.title || ""));
         html = html.replace(/{{VERSION}}/g, String(doc.info.version || ""));
         html = html.replace(/{{DESCRIPTION}}/g, String(doc.info.description || ""));
+
         if (typeof res.type === "function" && typeof res.send === "function") {
           res.type("html").send(html);
           return;
