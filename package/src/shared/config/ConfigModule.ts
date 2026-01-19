@@ -1,11 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import path from "node:path";
+import { createRequire } from "node:module";
 
 /**
  * Config Files Extensions Supported
  * ex: azura.config.*extension
  */
-
 type SupportedConfigFile = ".js" | ".ts" | ".json" | ".yaml" | ".yml";
 
 export type ConfigTypes = {
@@ -56,10 +57,8 @@ export class ConfigModule {
 
   /**
    * Load config files first (azura.config.*)
-   * Recivied error if config file not found or invalid format
-   * @param configFiles
+   * Received error if config file not found or invalid format
    */
-
   initSync(): void {
     const cdw = process.cwd();
     const configFiles = [
@@ -70,27 +69,34 @@ export class ConfigModule {
     ];
 
     let loaded = false;
+
     for (const fileName of configFiles) {
       const filePath = path.join(cdw, fileName);
       if (!existsSync(filePath)) continue;
 
       const extension = path.extname(fileName) as SupportedConfigFile;
-      const raw = readFileSync(filePath, "utf8");
 
       try {
         let parsed: ConfigTypes;
+
         switch (extension) {
           case ".ts":
           case ".js":
+            // Usa createRequire para manter compatibilidade com ESM
+            const require = createRequire(import.meta.url);
             const mod = require(filePath);
             parsed = mod.default || mod;
             break;
           case ".json":
+            const raw = readFileSync(filePath, "utf8");
             parsed = JSON.parse(raw);
             break;
           case ".yaml":
           case ".yml":
-            parsed = require("js-yaml").load(raw);
+            const yamlRaw = readFileSync(filePath, "utf8");
+            const requireYaml = createRequire(import.meta.url);
+            const jsYaml = requireYaml("js-yaml");
+            parsed = jsYaml.load(yamlRaw) as ConfigTypes;
             break;
           default:
             throw new Error(`Invalid config file extension: ${extension}`);
@@ -113,7 +119,6 @@ export class ConfigModule {
    * Get all configs from loaded config file
    * @returns ConfigTypes
    */
-
   getAll(): ConfigTypes {
     return this.config;
   }
@@ -125,7 +130,6 @@ export class ConfigModule {
    * @param {T} key - key of the config to retrieve
    * @returns {ConfigTypes[T]}
    */
-
   get<T extends keyof ConfigTypes>(key: T): ConfigTypes[T] {
     return this.config[key];
   }
