@@ -8,132 +8,45 @@ import type {
   Header,
 } from "../types/swagger.type";
 
-const AZURA_SWAGGER = {
-  META: "__azura_api_metadata__",
-  RESP: "__azura_api_responses__",
-  PARAMS: "__azura_api_parameters__",
-  BODY: "__azura_api_body__",
-  TAGS: "__azura_api_tags__",
-};
+const KEY_META = Symbol.for("azura:swagger:meta");
+const KEY_RESP = Symbol.for("azura:swagger:resp");
+const KEY_PARAMS = Symbol.for("azura:swagger:params");
+const KEY_BODY = Symbol.for("azura:swagger:body");
+const KEY_TAGS = Symbol.for("azura:swagger:tags");
 
-export function ApiDoc(metadata: Omit<ApiDocMetadata, "method" | "path">): MethodDecorator {
-  return (target, propertyKey) => {
-    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
-    if (!ctor[AZURA_SWAGGER.META]) ctor[AZURA_SWAGGER.META] = new Map<string, ApiDocMetadata>();
-    ctor[AZURA_SWAGGER.META].set(String(propertyKey), metadata);
-  };
-}
+function getStorage<T>(target: any, key: symbol): Map<string, T> {
+  const source = typeof target === "function" && target.prototype ? target.prototype : target;
 
-export function ApiResponse(
-  statusCode: number,
-  description: string,
-  options?: {
-    type?: any;
-    examples?: Record<string, any>;
-    headers?: Record<string, Header>;
-  },
-): MethodDecorator {
-  return (target, propertyKey) => {
-    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
-    if (!ctor[AZURA_SWAGGER.RESP])
-      ctor[AZURA_SWAGGER.RESP] = new Map<string, ApiResponseMetadata[]>();
-    const key = String(propertyKey);
-    const responses = ctor[AZURA_SWAGGER.RESP].get(key) ?? [];
-    responses.push({
-      statusCode,
-      description,
-      type: options?.type,
-      examples: options?.examples,
-      headers: options?.headers,
+  if (!source[key]) {
+    Object.defineProperty(source, key, {
+      value: new Map<string, T>(),
+      enumerable: false,
+      writable: true,
+      configurable: true,
     });
-    ctor[AZURA_SWAGGER.RESP].set(key, responses);
-  };
+  }
+  return source[key];
 }
 
-export function ApiParameter(
-  name: string,
-  paramIn: "query" | "header" | "path" | "cookie",
-  options?: {
-    description?: string;
-    required?: boolean;
-    type?: any;
-    example?: any;
-    schema?: Schema;
-  },
-): MethodDecorator {
-  return (target, propertyKey) => {
-    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
-    if (!ctor[AZURA_SWAGGER.PARAMS])
-      ctor[AZURA_SWAGGER.PARAMS] = new Map<string, ApiParameterMetadata[]>();
-    const key = String(propertyKey);
-    const params = ctor[AZURA_SWAGGER.PARAMS].get(key) ?? [];
-    params.push({
-      name,
-      in: paramIn,
-      description: options?.description,
-      required: options?.required,
-      type: options?.type,
-      example: options?.example,
-      schema: options?.schema,
-    });
-    ctor[AZURA_SWAGGER.PARAMS].set(key, params);
-  };
-}
+export function getSwaggerMetadata(target: any) {
+  if (!target) {
+    return {
+      metadata: new Map(),
+      responses: new Map(),
+      parameters: new Map(),
+      body: new Map(),
+      tags: [],
+    };
+  }
 
-export function ApiBody(
-  description: string,
-  options?: {
-    type?: any;
-    required?: boolean;
-    examples?: Record<string, any>;
-  },
-): MethodDecorator {
-  return (target, propertyKey) => {
-    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
-    if (!ctor[AZURA_SWAGGER.BODY]) ctor[AZURA_SWAGGER.BODY] = new Map<string, ApiBodyMetadata>();
-    ctor[AZURA_SWAGGER.BODY].set(String(propertyKey), {
-      description,
-      type: options?.type,
-      required: options?.required,
-      examples: options?.examples,
-    });
-  };
-}
+  const source = typeof target === "function" && target.prototype ? target.prototype : target;
 
-export function ApiTags(...tags: string[]): ClassDecorator {
-  return (target) => {
-    (target as any)[AZURA_SWAGGER.TAGS] = tags;
-  };
-}
-
-export function ApiDeprecated(): MethodDecorator {
-  return (target, propertyKey) => {
-    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
-    if (!ctor[AZURA_SWAGGER.META]) ctor[AZURA_SWAGGER.META] = new Map<string, ApiDocMetadata>();
-    const key = String(propertyKey);
-    const existing = ctor[AZURA_SWAGGER.META].get(key) ?? {};
-    ctor[AZURA_SWAGGER.META].set(key, { ...existing, deprecated: true });
-  };
-}
-
-export function ApiSecurity(...requirements: SecurityRequirement[]): MethodDecorator {
-  return (target, propertyKey) => {
-    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
-    if (!ctor[AZURA_SWAGGER.META]) ctor[AZURA_SWAGGER.META] = new Map<string, ApiDocMetadata>();
-    const key = String(propertyKey);
-    const existing = ctor[AZURA_SWAGGER.META].get(key) ?? {};
-    ctor[AZURA_SWAGGER.META].set(key, { ...existing, security: requirements });
-  };
-}
-
-export function getSwaggerMetadata(target: Function) {
-  const ctor = target as any;
   return {
-    metadata: ctor[AZURA_SWAGGER.META] ?? new Map<string, ApiDocMetadata>(),
-    responses: ctor[AZURA_SWAGGER.RESP] ?? new Map<string, ApiResponseMetadata[]>(),
-    parameters: ctor[AZURA_SWAGGER.PARAMS] ?? new Map<string, ApiParameterMetadata[]>(),
-    body: ctor[AZURA_SWAGGER.BODY] ?? new Map<string, ApiBodyMetadata>(),
-    tags: ctor[AZURA_SWAGGER.TAGS] ?? [],
+    metadata: (source[KEY_META] as Map<string, ApiDocMetadata>) ?? new Map(),
+    responses: (source[KEY_RESP] as Map<string, ApiResponseMetadata[]>) ?? new Map(),
+    parameters: (source[KEY_PARAMS] as Map<string, ApiParameterMetadata[]>) ?? new Map(),
+    body: (source[KEY_BODY] as Map<string, ApiBodyMetadata>) ?? new Map(),
+    tags: (source[KEY_TAGS] as string[]) ?? [],
   };
 }
 
@@ -151,12 +64,14 @@ export function Swagger(config: {
     required?: boolean;
     schema?: Schema;
     example?: any;
+    type?: any;
   }>;
   requestBody?: {
     description?: string;
     required?: boolean;
     content?: any;
     example?: any;
+    schema?: Schema;
   };
   responses?: Record<
     number,
@@ -165,27 +80,28 @@ export function Swagger(config: {
       example?: any;
       schema?: Schema;
       headers?: Record<string, Header>;
+      type?: any;
     }
   >;
 }): MethodDecorator {
   return (target, propertyKey) => {
-    const ctor = (typeof target === "function" ? target : (target as any).constructor) as any;
-    if (!ctor[AZURA_SWAGGER.META]) ctor[AZURA_SWAGGER.META] = new Map<string, ApiDocMetadata>();
     const key = String(propertyKey);
-    const existingMeta = ctor[AZURA_SWAGGER.META].get(key) ?? {};
-    const newMeta: ApiDocMetadata = {
+
+    const metaMap = getStorage<ApiDocMetadata>(target, KEY_META);
+    const existingMeta = metaMap.get(key) ?? {};
+    metaMap.set(key, {
+      ...existingMeta,
       summary: config.summary ?? existingMeta.summary,
       description: config.description ?? existingMeta.description,
       operationId: config.operationId ?? existingMeta.operationId,
       deprecated: config.deprecated ?? existingMeta.deprecated,
       security: config.security ?? existingMeta.security,
       tags: config.tags ?? existingMeta.tags,
-    };
-    ctor[AZURA_SWAGGER.META].set(key, newMeta);
-    if (config.parameters && config.parameters.length > 0) {
-      if (!ctor[AZURA_SWAGGER.PARAMS])
-        ctor[AZURA_SWAGGER.PARAMS] = new Map<string, ApiParameterMetadata[]>();
-      const existingParams = ctor[AZURA_SWAGGER.PARAMS].get(key) ?? [];
+    });
+
+    if (config.parameters) {
+      const paramMap = getStorage<ApiParameterMetadata[]>(target, KEY_PARAMS);
+      const currentParams = paramMap.get(key) ?? [];
       const newParams = config.parameters.map((p) => ({
         name: p.name,
         in: p.in,
@@ -193,30 +109,102 @@ export function Swagger(config: {
         required: p.required,
         schema: p.schema,
         example: p.example,
+        type: p.type,
       }));
-      ctor[AZURA_SWAGGER.PARAMS].set(key, [...existingParams, ...newParams]);
+      paramMap.set(key, [...currentParams, ...newParams]);
     }
+
     if (config.requestBody) {
-      if (!ctor[AZURA_SWAGGER.BODY]) ctor[AZURA_SWAGGER.BODY] = new Map<string, ApiBodyMetadata>();
-      ctor[AZURA_SWAGGER.BODY].set(key, {
+      const bodyMap = getStorage<ApiBodyMetadata>(target, KEY_BODY);
+      bodyMap.set(key, {
         description: config.requestBody.description,
         required: config.requestBody.required,
         type: config.requestBody.content,
-        examples: config.requestBody.example ? { default: config.requestBody.example } : undefined,
+        examples: config.requestBody.example
+          ? { default: { value: config.requestBody.example } }
+          : undefined,
       });
     }
+
     if (config.responses) {
-      if (!ctor[AZURA_SWAGGER.RESP])
-        ctor[AZURA_SWAGGER.RESP] = new Map<string, ApiResponseMetadata[]>();
-      const existing = ctor[AZURA_SWAGGER.RESP].get(key) ?? [];
-      const responses = Object.entries(config.responses).map(([code, resp]) => ({
+      const respMap = getStorage<ApiResponseMetadata[]>(target, KEY_RESP);
+      const currentResponses = respMap.get(key) ?? [];
+      const newResponses = Object.entries(config.responses).map(([code, resp]) => ({
         statusCode: Number(code),
         description: resp.description,
-        type: resp.schema,
-        examples: resp.example ? { default: resp.example } : undefined,
+        type: resp.type ?? resp.schema,
+        examples: resp.example ? { default: { value: resp.example } } : undefined,
         headers: resp.headers,
       }));
-      ctor[AZURA_SWAGGER.RESP].set(key, [...existing, ...responses]);
+      respMap.set(key, [...currentResponses, ...newResponses]);
     }
+  };
+}
+
+export function ApiTags(...tags: string[]): ClassDecorator {
+  return (target) => {
+    const source = target.prototype || target;
+    Object.defineProperty(source, KEY_TAGS, {
+      value: tags,
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    });
+  };
+}
+
+export function ApiDoc(metadata: Omit<ApiDocMetadata, "method" | "path">): MethodDecorator {
+  return (target, propertyKey) => {
+    const metaMap = getStorage<ApiDocMetadata>(target, KEY_META);
+    metaMap.set(String(propertyKey), metadata);
+  };
+}
+
+export function ApiResponse(
+  statusCode: number,
+  description: string,
+  options?: any,
+): MethodDecorator {
+  return (target, propertyKey) => {
+    const respMap = getStorage<ApiResponseMetadata[]>(target, KEY_RESP);
+    const key = String(propertyKey);
+    const responses = respMap.get(key) ?? [];
+    responses.push({ statusCode, description, ...options });
+    respMap.set(key, responses);
+  };
+}
+
+export function ApiParameter(name: string, paramIn: any, options?: any): MethodDecorator {
+  return (target, propertyKey) => {
+    const paramMap = getStorage<ApiParameterMetadata[]>(target, KEY_PARAMS);
+    const key = String(propertyKey);
+    const params = paramMap.get(key) ?? [];
+    params.push({ name, in: paramIn, ...options });
+    paramMap.set(key, params);
+  };
+}
+
+export function ApiBody(description: string, options?: any): MethodDecorator {
+  return (target, propertyKey) => {
+    const bodyMap = getStorage<ApiBodyMetadata>(target, KEY_BODY);
+    bodyMap.set(String(propertyKey), { description, ...options });
+  };
+}
+
+export function ApiDeprecated(): MethodDecorator {
+  return (target, propertyKey) => {
+    const metaMap = getStorage<ApiDocMetadata>(target, KEY_META);
+    const key = String(propertyKey);
+    const existing = metaMap.get(key) ?? {};
+    metaMap.set(key, { ...existing, deprecated: true });
+  };
+}
+
+export function ApiSecurity(...requirements: SecurityRequirement[]): MethodDecorator {
+  return (target, propertyKey) => {
+    const metaMap = getStorage<ApiDocMetadata>(target, KEY_META);
+    const key = String(propertyKey);
+    const existing = metaMap.get(key) ?? {};
+    metaMap.set(key, { ...existing, security: requirements });
   };
 }

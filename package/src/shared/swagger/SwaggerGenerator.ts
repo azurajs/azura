@@ -1,14 +1,13 @@
-import { getSwaggerMetadata } from "../../swagger";
+import { getSwaggerMetadata } from "../../decorators/Swagger";
+
 import type { RouteDefinition } from "../../types";
 import type {
   OpenAPIDocument,
-  OpenAPIPaths,
   Operation,
   PathItem,
   Parameter,
   Response,
   Schema,
-  Reference,
   MediaType,
   SwaggerConfig,
   RequestBody,
@@ -56,14 +55,22 @@ export class SwaggerGenerator {
   public addController(ControllerClass: Function, routes: RouteDefinition[], prefix = ""): void {
     const metadata = getSwaggerMetadata(ControllerClass);
     const controllerTags = metadata.tags ?? [];
+
     for (const route of routes) {
       const fullPath = this.normalizePath(prefix + route.path);
       const method = route.method.toLowerCase() as keyof PathItem;
-      if (!this.document.paths[fullPath]) this.document.paths[fullPath] = {};
-      const methodMetadata = metadata.metadata?.get(route.propertyKey);
-      const responses = metadata.responses?.get(route.propertyKey) ?? [];
-      const parameters = metadata.parameters?.get(route.propertyKey) ?? [];
-      const body = metadata.body?.get(route.propertyKey);
+
+      if (!this.document.paths[fullPath]) {
+        this.document.paths[fullPath] = {};
+      }
+
+      const propertyKey = String(route.propertyKey);
+
+      const methodMetadata = metadata.metadata.get(propertyKey);
+      const responses = metadata.responses.get(propertyKey) ?? [];
+      const parameters = metadata.parameters.get(propertyKey) ?? [];
+      const body = metadata.body.get(propertyKey);
+
       const operation: Operation = {
         summary: methodMetadata?.summary ?? route.description,
         description: methodMetadata?.description,
@@ -76,176 +83,19 @@ export class SwaggerGenerator {
         parameters: this.buildParameters(parameters, route),
         responses: this.buildResponses(responses),
       };
-      if (body) operation.requestBody = this.buildRequestBody(body);
+
+      if (body) {
+        operation.requestBody = this.buildRequestBody(body);
+      }
+
       (this.document.paths[fullPath] as any)[method] = operation;
     }
   }
 
-  public addRoute(config: {
-    method: string;
-    path: string;
-    summary?: string;
-    description?: string;
-    tags?: string[];
-    operationId?: string;
-    deprecated?: boolean;
-    security?: Array<Record<string, string[]>>;
-    parameters?: Parameter[];
-    requestBody?: RequestBody;
-    responses?: Record<string, Response>;
-  }): void {
-    const fullPath = this.normalizePath(config.path);
-    const method = config.method.toLowerCase() as keyof PathItem;
-    if (!this.document.paths[fullPath]) this.document.paths[fullPath] = {};
-    const pathParams = this.extractPathParams(config.path);
-    const allParameters: Parameter[] = [
-      ...(config.parameters || []),
-      ...pathParams
-        .filter((param) => !config.parameters?.some((p) => p.name === param))
-        .map((param) => ({
-          name: param,
-          in: "path" as const,
-          required: true,
-          schema: { type: "string" as const },
-          description: `Path parameter: ${param}`,
-        })),
-    ];
-    const operation: Operation = {
-      summary: config.summary,
-      description: config.description,
-      tags: config.tags,
-      operationId:
-        config.operationId ?? `${config.method}_${fullPath.replace(/[^a-zA-Z0-9]/g, "_")}`,
-      deprecated: config.deprecated,
-      security: config.security,
-      parameters: allParameters.length > 0 ? allParameters : undefined,
-      responses: config.responses || {
-        200: {
-          description: "Successful response",
-        },
-      },
-    };
-    if (config.requestBody) operation.requestBody = config.requestBody;
-    (this.document.paths[fullPath] as any)[method] = operation;
-  }
-
-  public addDoc(config: {
-    method: string;
-    path: string;
-    summary?: string;
-    description?: string;
-    tags?: string[];
-    operationId?: string;
-    deprecated?: boolean;
-    security?: Array<Record<string, string[]>>;
-    parameters?: Array<{
-      name: string;
-      in: "query" | "header" | "path" | "cookie";
-      description?: string;
-      required?: boolean;
-      schema?: Schema | Reference;
-      example?: any;
-    }>;
-    requestBody?: {
-      description?: string;
-      required?: boolean;
-      schema?: Schema | Reference;
-      example?: any;
-    };
-    responses?: Record<
-      number,
-      {
-        description: string;
-        example?: any;
-        schema?: Schema | Reference;
-      }
-    >;
-  }): void {
-    const fullPath = this.normalizePath(config.path);
-    const method = config.method.toLowerCase() as keyof PathItem;
-    if (!this.document.paths[fullPath]) this.document.paths[fullPath] = {};
-    const pathParams = this.extractPathParams(config.path);
-    const providedParams = config.parameters || [];
-    const allParameters: Parameter[] = [
-      ...providedParams.map((p) => ({
-        name: p.name,
-        in: p.in,
-        description: p.description,
-        required: p.required ?? p.in === "path",
-        schema: p.schema,
-        example: p.example,
-      })),
-      ...pathParams
-        .filter((param) => !providedParams.some((p) => p.name === param))
-        .map((param) => ({
-          name: param,
-          in: "path" as const,
-          required: true,
-          schema: { type: "string" as const },
-          description: `Path parameter: ${param}`,
-        })),
-    ];
-    const responses: Record<string, Response> = {};
-    if (config.responses) {
-      for (const [code, resp] of Object.entries(config.responses)) {
-        responses[code] = {
-          description: resp.description,
-          content:
-            resp.schema || resp.example
-              ? {
-                  "application/json": {
-                    schema: resp.schema,
-                    ...(resp.example && { examples: { default: { value: resp.example } } }),
-                  },
-                }
-              : undefined,
-        };
-      }
-    } else {
-      responses["200"] = { description: "Successful response" };
-    }
-    const operation: Operation = {
-      summary: config.summary,
-      description: config.description,
-      tags: config.tags,
-      operationId:
-        config.operationId ?? `${config.method}_${fullPath.replace(/[^a-zA-Z0-9]/g, "_")}`,
-      deprecated: config.deprecated,
-      security: config.security,
-      parameters: allParameters.length > 0 ? allParameters : undefined,
-      responses,
-    };
-    if (config.requestBody) {
-      operation.requestBody = {
-        description: config.requestBody.description,
-        required: config.requestBody.required ?? false,
-        content: {
-          "application/json": {
-            schema: config.requestBody.schema,
-            ...(config.requestBody.example && {
-              examples: { default: { value: config.requestBody.example } },
-            }),
-          },
-        },
-      };
-    }
-    (this.document.paths[fullPath] as any)[method] = operation;
-  }
-
-  private buildParameters(
-    parameters: Array<{
-      name: string;
-      in: "query" | "header" | "path" | "cookie";
-      description?: string;
-      required?: boolean;
-      type?: any;
-      example?: any;
-      schema?: Schema;
-    }>,
-    route: RouteDefinition,
-  ): Parameter[] {
+  private buildParameters(parameters: Array<any>, route: RouteDefinition): Parameter[] {
     const params: Parameter[] = [];
     const pathParams = this.extractPathParams(route.path);
+
     for (const paramName of pathParams) {
       const existing = parameters.find((p) => p.name === paramName && p.in === "path");
       params.push({
@@ -257,55 +107,40 @@ export class SwaggerGenerator {
         example: existing?.example,
       });
     }
+
     for (const param of parameters) {
-      if (param.in !== "path") {
-        params.push({
-          name: param.name,
-          in: param.in,
-          required: param.required ?? false,
-          description: param.description,
-          schema: param.schema ?? this.typeToSchema(param.type) ?? { type: "string" },
-          example: param.example,
-        });
-      }
+      if (param.in === "path" && pathParams.includes(param.name)) continue;
+
+      params.push({
+        name: param.name,
+        in: param.in,
+        required: param.required ?? false,
+        description: param.description,
+        schema: param.schema ?? this.typeToSchema(param.type) ?? { type: "string" },
+        example: param.example,
+      });
     }
     return params;
   }
 
-  private buildResponses(
-    responses: Array<{
-      statusCode: number;
-      description: string;
-      type?: any;
-      examples?: Record<string, any>;
-      headers?: Record<string, any>;
-    }>,
-  ): { [statusCode: string]: Response } {
-    const result: { [statusCode: string]: Response } = {};
+  private buildResponses(responses: Array<any>): { [key: string]: Response } {
+    const result: { [key: string]: Response } = {};
     if (responses.length === 0) {
       result["200"] = {
         description: "Successful response",
-        content: {
-          "application/json": {
-            schema: { type: "object" },
-          },
-        },
+        content: { "application/json": { schema: { type: "object" } } },
       };
     } else {
       for (const response of responses) {
         const content: Record<string, MediaType> = {};
-        if (response.type) {
+        if (response.type || response.examples) {
+          const schema =
+            response.type && typeof response.type !== "object" && response.type !== null
+              ? this.typeToSchema(response.type)
+              : (response.type as Schema);
           content["application/json"] = {
-            schema: this.typeToSchema(response.type) ?? { type: "object" },
-            examples: response.examples
-              ? Object.entries(response.examples).reduce(
-                  (acc, [key, value]) => {
-                    acc[key] = { value };
-                    return acc;
-                  },
-                  {} as Record<string, { value: any }>,
-                )
-              : undefined,
+            schema: schema ?? { type: "object" },
+            examples: response.examples,
           };
         }
         result[String(response.statusCode)] = {
@@ -318,70 +153,55 @@ export class SwaggerGenerator {
     return result;
   }
 
-  private buildRequestBody(body: {
-    description?: string;
-    type?: any;
-    required?: boolean;
-    examples?: Record<string, any>;
-  }): RequestBody {
+  private buildRequestBody(body: any): RequestBody {
+    const schema =
+      typeof body.type === "object" && body.type !== null
+        ? body.type
+        : (this.typeToSchema(body.type) ?? { type: "object" });
     return {
       description: body.description,
       required: body.required ?? false,
-      content: {
-        "application/json": {
-          schema: this.typeToSchema(body.type) ?? { type: "object" },
-          examples: body.examples
-            ? Object.entries(body.examples).reduce(
-                (acc, [key, value]) => {
-                  acc[key] = { value };
-                  return acc;
-                },
-                {} as Record<string, { value: any }>,
-              )
-            : undefined,
-        },
-      },
+      content: { "application/json": { schema, examples: body.examples } },
     };
   }
 
   private typeToSchema(type: any): Schema | undefined {
     if (!type) return undefined;
-    if (type === String) return { type: "string" };
-    if (type === Number) return { type: "number" };
-    if (type === Boolean) return { type: "boolean" };
-    if (type === Array) return { type: "array", items: { type: "object" } };
-    if (type === Object) return { type: "object" };
-    if (typeof type === "function") {
+    if (type === String || type === "string") return { type: "string" };
+    if (type === Number || type === "number") return { type: "number" };
+    if (type === Boolean || type === "boolean") return { type: "boolean" };
+    if (Array.isArray(type))
+      return {
+        type: "array",
+        items:
+          type.length > 0 ? (this.typeToSchema(type[0]) ?? { type: "object" }) : { type: "object" },
+      };
+    if (typeof type === "function" && type !== Object) {
       try {
         const instance = new type();
         const properties: Record<string, Schema> = {};
-        for (const key of Object.keys(instance)) {
-          const value = instance[key];
-          properties[key] = this.inferSchema(value);
-        }
-        return {
-          type: "object",
-          properties,
-        };
+        for (const key of Object.keys(instance)) properties[key] = this.inferSchema(instance[key]);
+        return { type: "object", properties };
       } catch {
-        return undefined;
+        return { type: "object" };
       }
     }
-    return undefined;
+    if (typeof type === "object") return this.inferSchema(type);
+    return { type: "object" };
   }
 
   private inferSchema(value: any): Schema {
     const type = typeof value;
-    if (type === "string") return { type: "string" };
-    if (type === "number") return { type: "number" };
-    if (type === "boolean") return { type: "boolean" };
-    if (Array.isArray(value)) {
+    if (value === null) return { type: "string", nullable: true };
+    if (type === "string") return { type: "string", example: value };
+    if (type === "number") return { type: "number", example: value };
+    if (type === "boolean") return { type: "boolean", example: value };
+    if (Array.isArray(value))
       return {
         type: "array",
         items: value.length > 0 ? this.inferSchema(value[0]) : { type: "object" },
       };
-    }
-    if (type === "object" && value !== null) {
+    if (type === "object") {
       const properties: Record<string, Schema> = {};
       for (const key in value) properties[key] = this.inferSchema(value[key]);
       return { type: "object", properties };
@@ -398,96 +218,60 @@ export class SwaggerGenerator {
     return path.replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
   }
 
-  public addSchema(name: string, schema: Schema): void {
+  public getConfig() {
+    return this.config;
+  }
+  public getDocument() {
+    return this.document;
+  }
+  public toJSON() {
+    return JSON.stringify(this.document, null, 2);
+  }
+  public addSchema(name: string, schema: Schema) {
     if (!this.document.components) this.document.components = { schemas: {} };
     if (!this.document.components.schemas) this.document.components.schemas = {};
     this.document.components.schemas[name] = schema;
   }
-
-  public addSecurityScheme(name: string, scheme: any): void {
+  public addSecurityScheme(name: string, scheme: any) {
     if (!this.document.components) this.document.components = { securitySchemes: {} };
     if (!this.document.components.securitySchemes) this.document.components.securitySchemes = {};
     this.document.components.securitySchemes[name] = scheme;
   }
-
-  public getDocument(): OpenAPIDocument {
-    return this.document;
-  }
-
-  public getConfig(): Required<SwaggerConfig> {
-    return this.config;
-  }
-
-  public toJSON(): string {
-    return JSON.stringify(this.document, null, 2);
-  }
-
-  public static createResponse(
-    description: string,
-    schema?: Schema | Reference,
-    example?: any,
-  ): Response {
-    return {
-      description,
-      content: schema
-        ? {
-            "application/json": {
-              schema,
-              ...(example && { examples: { default: { value: example } } }),
-            },
-          }
-        : undefined,
+  public addRoute(config: any) {
+    const fullPath = this.normalizePath(config.path);
+    const method = config.method.toLowerCase();
+    if (!this.document.paths[fullPath]) this.document.paths[fullPath] = {};
+    (this.document.paths[fullPath] as any)[method] = {
+      summary: config.summary,
+      description: config.description,
+      tags: config.tags,
+      operationId: config.operationId,
+      parameters: config.parameters,
+      responses: config.responses || { 200: { description: "OK" } },
+      requestBody: config.requestBody,
     };
   }
 
-  public static createRequestBody(
-    schema: Schema | Reference,
-    description?: string,
-    required = true,
-    example?: any,
-  ): RequestBody {
-    return {
-      description,
-      required,
-      content: {
-        "application/json": {
-          schema,
-          ...(example && { examples: { default: { value: example } } }),
-        },
-      },
-    };
-  }
-
-  public static createParameter(
-    name: string,
-    location: "query" | "path" | "header" | "cookie",
-    schema: Schema | Reference,
-    options?: {
-      description?: string;
-      required?: boolean;
-      deprecated?: boolean;
-      example?: any;
-    },
-  ): Parameter {
-    return {
-      name,
-      in: location,
-      description: options?.description,
-      required: options?.required ?? location === "path",
-      deprecated: options?.deprecated,
-      schema,
-      example: options?.example,
-    };
-  }
-
-  public static createSchema(
-    properties: Record<string, Schema | Reference>,
-    required?: string[],
-  ): Schema {
-    return {
-      type: "object",
-      properties,
-      required,
-    };
-  }
+  public static createResponse = (desc: string, schema?: any, ex?: any) => ({
+    description: desc,
+    content: schema
+      ? { "application/json": { schema, examples: ex ? { default: { value: ex } } : undefined } }
+      : undefined,
+  });
+  public static createRequestBody = (schema: any, desc?: string, req = true) => ({
+    description: desc,
+    required: req,
+    content: { "application/json": { schema } },
+  });
+  public static createParameter = (name: string, loc: any, schema: any, opts?: any) => ({
+    name,
+    in: loc,
+    schema,
+    ...opts,
+  });
+  public static createSchema = (props: any, req?: any) => ({
+    type: "object",
+    properties: props,
+    required: req,
+  });
 }
