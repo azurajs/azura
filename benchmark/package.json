@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.8",
-    "azurajs": "^2.0.0",
+    "azurajs": "^2.5.5-1",
     "elysia": "^1.1.31",
     "express": "^4.21.2",
     "fastify": "^5.2.1",

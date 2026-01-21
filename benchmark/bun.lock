@@ -5,7 +5,7 @@
       "name": "azurajs-benchmark",
       "dependencies": {
         "@hono/node-server": "^1.19.8",
-        "azurajs": "^2.0.0",
+        "azurajs": "^2.5.5-1",
         "elysia": "^1.1.31",
         "express": "^4.21.2",
         "fastify": "^5.2.1",
@@ -147,7 +147,7 @@
 
     "avvio": ["avvio@9.1.0", "", { "dependencies": { "@fastify/error": "^4.0.0", "fastq": "^1.17.1" } }, "sha512-fYASnYi600CsH/j9EQov7lECAniYiBFiiAtBNuZYLA2leLe9qOvZzqYHFjtIj6gD2VMoMLP14834LFWvr4IfDw=="],
 
-    "azurajs": ["azurajs@2.0.0", "", { "peerDependencies": { "typescript": "^5.0.0" } }, "sha512-ESg06/lZZynpPEY1kgrpqlfZ8+1P7MLp9BZwnVK250o2/L0jBcMQtKcwt9qYyyKw4TPRRBgCupFe+wR1XrvSZQ=="],
+    "azurajs": ["azurajs@2.5.5-1", "", { "peerDependencies": { "typescript": "^5.0.0" } }, "sha512-m3VcuYvtJNArTKdeP6WsHpDf4xGULTKyaou1WEcTZlXOP9Q7exw9RLbyehVu98AgKLf20cDX0UxKnyfFV+RTDA=="],
 
     "base64-js": ["base64-js@1.5.1", "", {}, "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA=="],
 

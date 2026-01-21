@@ -1,15 +1,6 @@
-import {
-  applyDecorators,
-  AzuraClient,
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-  Res,
-} from "azurajs";
-import type { ResponseServer } from "azurajs";
+import { AzuraClient } from "azurajs";
+import { applyDecorators, Body, Controller, Get, Param, Post, Query, Res } from "azurajs/decorators";
+import type { ResponseServer } from "azurajs/types";
 
 @Controller("")
 class BenchmarkController {
