@@ -3,9 +3,9 @@
  * Use o novo @Swagger decorator - tudo em um só lugar! 🎉
  */
 
-import { AzuraClient } from '../../../package/src/infra/Server';
-import { setupSwaggerWithControllers, Swagger } from '../../../package/src/swagger';
-import { Controller, Get, Post } from '../../../package/src/decorators';
+import { AzuraClient } from '../../../package/azurajs/src/infra/Server';
+import { setupSwaggerWithControllers, Swagger } from '../../../package/azurajs/src/swagger';
+import { Controller, Get, Post } from '../../../package/azurajs/src/decorators';
 
 @Controller('/binary')
 class BinaryController {
@@ -250,7 +250,8 @@ setupSwaggerWithControllers(app, {
   tags: [
     { name: 'code-binary', description: 'Operações de codificação binária' },
     { name: 'Users', description: 'Gerenciamento de usuários' }
-  ]
+  ],
+  enabled: false
 }, [BinaryController, UserController]);
 
 app.listen(3000).then(() => {

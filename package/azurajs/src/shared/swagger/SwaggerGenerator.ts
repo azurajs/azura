@@ -19,7 +19,7 @@ export class SwaggerGenerator {
 
   constructor(config?: SwaggerConfig) {
     this.config = {
-      enabled: config?.enabled ?? true,
+      uiEnabled: config?.uiEnabled ?? true,
       path: config?.path ?? "/docs",
       title: config?.title ?? "AzuraJS API",
       description: config?.description ?? "API documentation powered by AzuraJS",

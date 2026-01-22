@@ -16,12 +16,13 @@ export class SwaggerIntegration {
 
   public setup(): void {
     const config = this.generator.getConfig();
-    if (!config.enabled) return;
 
     this.app.get(`/api-spec.json`, (_req: any, res: any) => {
       res.json(this.generator.getDocument());
     });
 
+    if (!config.uiEnabled) return;
+    
     this.app.get(config.path, (_req: any, res: any) => {
       try {
         const require = createRequire(import.meta.url);
@@ -37,7 +38,7 @@ export class SwaggerIntegration {
         html = html.replace(/{{DESCRIPTION}}/g, String(doc.info.description || ""));
 
         if (typeof res.type === "function" && typeof res.send === "function") {
-          res.type("html").send(html);
+          res.type("text/html").send(html);
           return;
         }
         if (typeof res.setHeader === "function" && typeof res.end === "function") {

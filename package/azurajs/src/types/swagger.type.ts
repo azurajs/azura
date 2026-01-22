@@ -304,7 +304,7 @@ export interface ApiBodyMetadata {
 }
 
 export interface SwaggerConfig {
-  enabled?: boolean;
+  uiEnabled?: boolean;
   path?: string;
   title?: string;
   description?: string;

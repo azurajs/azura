@@ -1,162 +1,165 @@
 import type { RequestHandler } from "../types";
-import { HttpError } from "./utils/HttpError";
-import { Node, type Handler } from "./utils/route/Node";
+import type { InternalHandler } from "../types/common.type";
+import { Node } from "./utils/route/Node";
 
 interface MatchResult {
-  handlers: Handler[];
+  handler: InternalHandler;
   params: Record<string, string>;
 }
 
 export class Router {
   private root = new Node();
-  private debug?: boolean;
+  private staticRoutes = new Map<string, Record<string, InternalHandler>>();
   private middlewares: RequestHandler[] = [];
+  private debug: boolean;
 
   constructor(debug = false) {
     this.debug = debug;
   }
 
-  add(method: string, path: string, ...handlers: Handler[]) {
-    const segments = path.split("/").filter(Boolean);
-    let node = this.root;
+  add(method: string, path: string, handler: InternalHandler): void {
+    const upperMethod = method.toUpperCase();
 
     if (this.debug) {
-      console.log(`[Router:DEBUG] Adding ${method} ${path}`);
-      console.log(`[Router:DEBUG] Segments:`, segments);
+      console.log(`[Router:DEBUG] Adding ${upperMethod} ${path}`);
     }
 
-    for (const seg of segments) {
-      let child: Node;
+    if (!path.includes(":")) {
+      let methodMap = this.staticRoutes.get(path);
+      if (!methodMap) {
+        methodMap = Object.create(null) as Record<string, InternalHandler>;
+        this.staticRoutes.set(path, methodMap);
+      }
+      methodMap[upperMethod] = handler;
 
-      if (seg.startsWith(":")) {
-        const paramKey = ":";
-        const existingChild = node.children.get(paramKey);
-        
-        if (!existingChild) {
-          child = new Node();
-          child.isParam = true;
-          child.paramName = seg.slice(1);
-          node.children.set(paramKey, child);
-          
-          if (this.debug) {
-            console.log(`[Router:DEBUG] Created param node: :${seg.slice(1)}`);
-          }
-        } else {
-          child = existingChild;
-          // Update paramName if it's different (shouldn't happen in normal usage)
-          if (child.paramName !== seg.slice(1)) {
+      if (this.debug) {
+        console.log(`[Router:DEBUG] Added as static optimized route: ${path}`);
+      }
+    }
+
+    let node = this.root;
+    let start = 0;
+    const len = path.length;
+    for (let i = 0; i <= len; i++) {
+      const ch = path.charCodeAt(i);
+      if (ch === 47 || i === len) {
+        const segment = path.substring(start, i);
+        start = i + 1;
+        if (!segment) continue;
+
+        if (segment.startsWith(":")) {
+          if (!node.paramNode) {
+            node.paramNode = new Node();
+            node.paramNode.paramName = segment.slice(1);
             if (this.debug) {
-              console.warn(`[Router:DEBUG] Warning: Param name mismatch at "${seg}". Previous: ":${child.paramName}", New: ":${seg.slice(1)}"`);
+              console.log(`[Router:DEBUG] Created param node: :${node.paramNode.paramName}`);
             }
           }
-        }
-      } else {
-        const existingLiteralChild = node.children.get(seg);
-        
-        if (!existingLiteralChild) {
-          child = new Node();
-          node.children.set(seg, child);
-          
-          if (this.debug) {
-            console.log(`[Router:DEBUG] Created literal node: "${seg}"`);
-          }
+          node = node.paramNode;
         } else {
-          child = existingLiteralChild;
+          if (!node.children[segment]) {
+            node.children[segment] = new Node();
+            if (this.debug) {
+              console.log(`[Router:DEBUG] Created literal node: "${segment}"`);
+            }
+          }
+          node = node.children[segment];
         }
       }
-
-      node = child;
     }
+
+    node.handlers[upperMethod] = handler;
 
     if (this.debug) {
-      console.log(`[Router:DEBUG] Setting handler for ${method} at final node`);
+      console.log(`[Router:DEBUG] Handler set for ${upperMethod} at tree leaf`);
     }
-
-    node.handlers.set(method.toUpperCase(), handlers);
   }
 
-  find(method: string, path: string): MatchResult {
-    const cleanPath = path.split("?")[0] || "/";
-    const segments = cleanPath === "/" ? [] : cleanPath.split("/").filter(Boolean);
-    let node = this.root;
-    const params: Record<string, string> = {};
+  public find(method: string, path: string): MatchResult | null {
+    const upperMethod = method.toUpperCase();
+    const qIdx = path.indexOf("?");
+    const cleanPath = qIdx === -1 ? path : path.substring(0, qIdx);
 
     if (this.debug) {
-      console.log(`[Router:DEBUG] Finding ${method} ${cleanPath}`);
-      console.log(`[Router:DEBUG] Segments:`, segments);
+      console.log(`[Router:DEBUG] Finding ${upperMethod} ${cleanPath}`);
     }
 
-    for (let i = 0; i < segments.length; i++) {
-      const seg = segments[i];
-      if (!seg) continue;
+    const staticEntry = this.staticRoutes.get(cleanPath);
+    if (staticEntry && staticEntry[upperMethod]) {
+      if (this.debug) console.log(`[Router:DEBUG] Static route hit: ${cleanPath}`);
+      return { handler: staticEntry[upperMethod], params: Object.create(null) };
+    }
 
-      let child = node.children.get(seg);
+    let node = this.root;
+    const params: Record<string, string> = Object.create(null);
 
-      if (child) {
-        node = child;
-        if (this.debug) {
-          console.log(`[Router:DEBUG] Matched literal segment: "${seg}"`);
-        }
-      } else {
-        child = node.children.get(":");
-        if (child) {
-          node = child;
-          if (node.paramName) {
-            params[node.paramName] = seg;
-            if (this.debug) {
-              console.log(`[Router:DEBUG] Matched param segment: ":${node.paramName}" = "${seg}"`);
-            }
-          } else if (this.debug) {
-            console.warn(`[Router:DEBUG] Warning: Param node found but paramName is undefined!`);
+    let start = 0;
+    if (cleanPath.length > 0 && cleanPath.charCodeAt(0) === 47) start = 1;
+
+    const len = cleanPath.length;
+    for (let i = start; i <= len; i++) {
+      const ch = cleanPath.charCodeAt(i);
+      if (ch === 47 || i === len) {
+        const segment = cleanPath.substring(start, i);
+        start = i + 1;
+        if (!segment) continue;
+
+        const nextNode = node.children[segment];
+        if (nextNode) {
+          node = nextNode;
+          if (this.debug) {
+            console.log(`[Router:DEBUG] Matched literal segment: "${segment}"`);
+          }
+        } else if (node.paramNode) {
+          node = node.paramNode;
+          params[node.paramName] = segment;
+          if (this.debug) {
+            console.log(
+              `[Router:DEBUG] Matched param segment: ":${node.paramName}" = "${segment}"`,
+            );
           }
         } else {
           if (this.debug) {
-            console.error(`[Router:DEBUG] Route not found for ${method} ${cleanPath}`);
-            console.error(`[Router:DEBUG] Failed at segment: "${seg}"`);
-            console.error(`[Router:DEBUG] Available children:`, Array.from(node.children.keys()));
+            console.log(`[Router:DEBUG] No matching child for segment: "${segment}"`);
           }
-          throw new HttpError(404, "Route not found");
+          return null;
         }
       }
     }
 
-    const handlers = node.handlers.get(method.toUpperCase()) as Handler[];
-    if (!handlers) {
+    const handler = node.handlers[upperMethod];
+    if (!handler) {
       if (this.debug) {
-        console.error(
-          `[Router:DEBUG] No handlers for method ${method.toUpperCase()} at path ${cleanPath}`
-        );
-        console.error(
-          `[Router:DEBUG] Available methods at this path:`,
-          Array.from(node.handlers.keys())
-        );
-        console.error(`[Router:DEBUG] Segments matched:`, segments);
+        console.log(`[Router:DEBUG] No handler for method ${upperMethod} at ${cleanPath}`);
       }
-      throw new HttpError(404, "Route not found");
+      return null;
     }
-    
+
     if (this.debug) {
-      console.log(`[Router:DEBUG] Found handlers for ${method} ${cleanPath}`);
-      console.log(`[Router:DEBUG] Extracted params:`, params);
+      console.log(`[Router:DEBUG] Found handler. Params:`, params);
     }
-    
-    return { handlers, params };
+
+    return { handler, params };
   }
 
   public listRoutes(): Array<{ method: string; path: string }> {
     const routes: Array<{ method: string; path: string }> = [];
 
-    const traverse = (node: Node, path: string) => {
-      if (node.handlers.size > 0) {
-        for (const method of node.handlers.keys()) {
-          routes.push({ method, path: path || "/" });
+    const traverse = (node: Node, currentPath: string) => {
+      const methods = Object.keys(node.handlers);
+      for (const method of methods) {
+        routes.push({ method, path: currentPath || "/" });
+      }
+
+      for (const key in node.children) {
+        const childNode = node.children[key];
+        if (childNode) {
+          traverse(childNode, currentPath + "/" + key);
         }
       }
 
-      for (const [segment, child] of node.children) {
-        const newPath =
-          path + "/" + (segment === ":" && child.paramName ? `:${child.paramName}` : segment);
-        traverse(child, newPath);
+      if (node.paramNode) {
+        traverse(node.paramNode, currentPath + "/:" + node.paramNode.paramName);
       }
     };
 
@@ -164,19 +167,17 @@ export class Router {
     return routes;
   }
 
-  public use(mw: RequestHandler): void;
   public use(prefix: string, router: Router): void;
-  public use(prefixOrMw: string | RequestHandler, router?: Router): void {
-    if (typeof prefixOrMw === "function") {
-      this.middlewares.push(prefixOrMw);
-    } else if (typeof prefixOrMw === "string" && router instanceof Router) {
+  public use(_arg: unknown): void;
+  public use(prefixOrMw: string | unknown, router?: Router): void {
+    if (typeof prefixOrMw === "string" && router instanceof Router) {
       const prefix = prefixOrMw.endsWith("/") ? prefixOrMw.slice(0, -1) : prefixOrMw;
       const routes = router.listRoutes();
-
-      for (const route of routes) {
-        const fullPath = prefix + (route.path === "/" ? "" : route.path);
-        const { handlers } = router.find(route.method, route.path);
-        this.add(route.method, fullPath, ...handlers);
+      for (const r of routes) {
+        const found = router.find(r.method, r.path);
+        if (!found) continue;
+        const fullPath = prefix + (r.path === "/" ? "" : r.path);
+        this.add(r.method, fullPath, found.handler);
       }
     }
   }
