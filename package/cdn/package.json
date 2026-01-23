@@ -1,0 +1,58 @@
+{
+  "name": "@azurajs/cdn",
+  "version": "1.0.0",
+  "description": "Modern Typescript-first",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": [
+    "typescript",
+    "framework",
+    "web",
+    "api",
+    "rest",
+    "cdn",
+    "server",
+    "backend",
+    "bun",
+    "node",
+    "zero-dependency",
+    "lightweight",
+    "fast"
+  ],
+  "author": "0xviny.dev@gmail.com",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/azurajs/cdn.git"
+  },
+  "bugs": {
+    "url": "https://github.com/azurajs/cdn/issues"
+  },
+  "homepage": "https://github.com/azurajs/cdn#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "tsup": "^8.5.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "azurajs": "^2.6.0"
+  }
+}
