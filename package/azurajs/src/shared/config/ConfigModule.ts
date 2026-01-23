@@ -63,6 +63,7 @@ export class ConfigModule {
     const cdw = process.cwd();
     const configFiles = [
       "azura.config.ts",
+      "azura.config.js",
       "azura.config.json",
       "azura.config.yaml",
       "azura.config.yml",
