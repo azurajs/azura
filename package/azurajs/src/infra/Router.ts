@@ -1,29 +1,42 @@
 import type { RequestHandler } from "../types";
 import type { InternalHandler } from "../types/common.type";
 import { Node } from "./utils/route/Node";
+import { composeHandlers } from "./utils/Compose";
 
 interface MatchResult {
   handler: InternalHandler;
   params: Record<string, string>;
 }
 
+function adaptRouterHandler(handler: RequestHandler): InternalHandler {
+  return async (ctx) => {
+    if (typeof handler !== "function") return;
+    if (handler.length > 1) {
+      return (handler as any)(ctx.req, ctx.res, ctx.next);
+    } else {
+      return (handler as any)(ctx);
+    }
+  };
+}
+
 export class Router {
   private root = new Node();
   private staticRoutes = new Map<string, Record<string, InternalHandler>>();
-  private middlewares: RequestHandler[] = [];
   private debug: boolean;
+  private middlewares: InternalHandler[] = [];
 
   constructor(debug = false) {
     this.debug = debug;
   }
 
-  add(method: string, path: string, handler: InternalHandler): void {
+  private insert(method: string, path: string, handler: InternalHandler): void {
     const upperMethod = method.toUpperCase();
 
     if (this.debug) {
-      console.log(`[Router:DEBUG] Adding ${upperMethod} ${path}`);
+      console.log(`[Router:DEBUG] Inserting compiled handler for ${upperMethod} ${path}`);
     }
 
+    // Otimização: Se não tem parâmetros, adiciona ao mapa estático para acesso O(1)
     if (!path.includes(":")) {
       let methodMap = this.staticRoutes.get(path);
       if (!methodMap) {
@@ -32,9 +45,9 @@ export class Router {
       }
       methodMap[upperMethod] = handler;
 
-      if (this.debug) {
-        console.log(`[Router:DEBUG] Added as static optimized route: ${path}`);
-      }
+      // IMPORTANTE: Não damos 'return' aqui.
+      // Precisamos continuar para inserir na árvore também,
+      // senão o listRoutes() não consegue encontrar essa rota para clonar em sub-routers.
     }
 
     let node = this.root;
@@ -51,28 +64,24 @@ export class Router {
           if (!node.paramNode) {
             node.paramNode = new Node();
             node.paramNode.paramName = segment.slice(1);
-            if (this.debug) {
-              console.log(`[Router:DEBUG] Created param node: :${node.paramNode.paramName}`);
-            }
           }
           node = node.paramNode;
         } else {
           if (!node.children[segment]) {
             node.children[segment] = new Node();
-            if (this.debug) {
-              console.log(`[Router:DEBUG] Created literal node: "${segment}"`);
-            }
           }
           node = node.children[segment];
         }
       }
     }
-
     node.handlers[upperMethod] = handler;
+  }
 
-    if (this.debug) {
-      console.log(`[Router:DEBUG] Handler set for ${upperMethod} at tree leaf`);
-    }
+  public add(method: string, path: string, handler: InternalHandler): void {
+    const composed =
+      this.middlewares.length > 0 ? composeHandlers([...this.middlewares, handler]) : handler;
+
+    this.insert(method, path, composed);
   }
 
   public find(method: string, path: string): MatchResult | null {
@@ -80,16 +89,13 @@ export class Router {
     const qIdx = path.indexOf("?");
     const cleanPath = qIdx === -1 ? path : path.substring(0, qIdx);
 
-    if (this.debug) {
-      console.log(`[Router:DEBUG] Finding ${upperMethod} ${cleanPath}`);
-    }
-
+    // 1. Tenta otimização estática primeiro (O(1))
     const staticEntry = this.staticRoutes.get(cleanPath);
     if (staticEntry && staticEntry[upperMethod]) {
-      if (this.debug) console.log(`[Router:DEBUG] Static route hit: ${cleanPath}`);
       return { handler: staticEntry[upperMethod], params: Object.create(null) };
     }
 
+    // 2. Se falhar, busca na árvore (Radix Tree)
     let node = this.root;
     const params: Record<string, string> = Object.create(null);
 
@@ -107,37 +113,17 @@ export class Router {
         const nextNode = node.children[segment];
         if (nextNode) {
           node = nextNode;
-          if (this.debug) {
-            console.log(`[Router:DEBUG] Matched literal segment: "${segment}"`);
-          }
         } else if (node.paramNode) {
           node = node.paramNode;
           params[node.paramName] = segment;
-          if (this.debug) {
-            console.log(
-              `[Router:DEBUG] Matched param segment: ":${node.paramName}" = "${segment}"`,
-            );
-          }
         } else {
-          if (this.debug) {
-            console.log(`[Router:DEBUG] No matching child for segment: "${segment}"`);
-          }
           return null;
         }
       }
     }
 
     const handler = node.handlers[upperMethod];
-    if (!handler) {
-      if (this.debug) {
-        console.log(`[Router:DEBUG] No handler for method ${upperMethod} at ${cleanPath}`);
-      }
-      return null;
-    }
-
-    if (this.debug) {
-      console.log(`[Router:DEBUG] Found handler. Params:`, params);
-    }
+    if (!handler) return null;
 
     return { handler, params };
   }
@@ -167,18 +153,68 @@ export class Router {
     return routes;
   }
 
+  public use(prefix: string, mw: RequestHandler): void;
+  public use(mw: RequestHandler): void;
   public use(prefix: string, router: Router): void;
-  public use(_arg: unknown): void;
-  public use(prefixOrMw: string | unknown, router?: Router): void {
-    if (typeof prefixOrMw === "string" && router instanceof Router) {
+  public use(prefixOrMw: string | RequestHandler, routerOrMw?: Router | RequestHandler): void {
+    if (typeof prefixOrMw === "function") {
+      this.middlewares.push(adaptRouterHandler(prefixOrMw));
+    } else if (typeof prefixOrMw === "string" && routerOrMw instanceof Router) {
       const prefix = prefixOrMw.endsWith("/") ? prefixOrMw.slice(0, -1) : prefixOrMw;
-      const routes = router.listRoutes();
+      const routes = routerOrMw.listRoutes();
+
       for (const r of routes) {
-        const found = router.find(r.method, r.path);
+        // Encontra o handler original no router filho
+        const found = routerOrMw.find(r.method, r.path);
         if (!found) continue;
+
         const fullPath = prefix + (r.path === "/" ? "" : r.path);
-        this.add(r.method, fullPath, found.handler);
+
+        // Aplica os middlewares DESTE router (pai) sobre o handler que já veio do filho
+        const finalHandler =
+          this.middlewares.length > 0
+            ? composeHandlers([...this.middlewares, found.handler])
+            : found.handler;
+
+        this.insert(r.method, fullPath, finalHandler);
       }
+    } else if (typeof prefixOrMw === "string" && typeof routerOrMw === "function") {
+      const prefix = prefixOrMw;
+      const mw = adaptRouterHandler(routerOrMw as RequestHandler);
+
+      const wrapper: InternalHandler = async (ctx) => {
+        if (ctx.req.path && ctx.req.path.startsWith(prefix)) {
+          return mw(ctx);
+        }
+        return ctx.next ? ctx.next() : Promise.resolve();
+      };
+
+      this.middlewares.push(wrapper);
     }
+  }
+
+  public get(path: string, ...handlers: RequestHandler[]): void {
+    const internalHandlers = handlers.map(adaptRouterHandler);
+    this.add("GET", path, composeHandlers(internalHandlers));
+  }
+
+  public post(path: string, ...handlers: RequestHandler[]): void {
+    const internalHandlers = handlers.map(adaptRouterHandler);
+    this.add("POST", path, composeHandlers(internalHandlers));
+  }
+
+  public put(path: string, ...handlers: RequestHandler[]): void {
+    const internalHandlers = handlers.map(adaptRouterHandler);
+    this.add("PUT", path, composeHandlers(internalHandlers));
+  }
+
+  public delete(path: string, ...handlers: RequestHandler[]): void {
+    const internalHandlers = handlers.map(adaptRouterHandler);
+    this.add("DELETE", path, composeHandlers(internalHandlers));
+  }
+
+  public patch(path: string, ...handlers: RequestHandler[]): void {
+    const internalHandlers = handlers.map(adaptRouterHandler);
+    this.add("PATCH", path, composeHandlers(internalHandlers));
   }
 }

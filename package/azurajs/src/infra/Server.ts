@@ -10,7 +10,6 @@ import { logger } from "../utils/Logger";
 import { parseQS } from "../utils/Parser";
 import { serializeCookie } from "../utils/cookies/SerializeCookie";
 import { parseCookiesHeader } from "../utils/cookies/ParserCookie";
-import { adaptRequestHandler } from "./utils/RequestHandler";
 import { Router } from "./Router";
 import type { InternalHandler, RequestHandler } from "../types/common.type";
 import { getIP } from "./utils/GetIp";
@@ -23,6 +22,17 @@ import { composeHandlers } from "./utils/Compose";
 
 export { createLoggingMiddleware } from "../middleware/LoggingMiddleware";
 export { proxyPlugin, createProxyMiddleware } from "../shared/plugins/ProxyPlugin";
+
+function adaptRequestHandler(handler: RequestHandler): InternalHandler {
+  return async (ctx) => {
+    if (typeof handler !== "function") return;
+    if (handler.length > 1) {
+      return (handler as any)(ctx.req, ctx.res, ctx.next);
+    } else {
+      return (handler as any)(ctx);
+    }
+  };
+}
 
 export class AzuraClient {
   private opts: ReturnType<ConfigModule["getAll"]>;
@@ -110,7 +120,7 @@ export class AzuraClient {
 
       const wrapper: RequestHandler = (req, res, next) => {
         if (req.path && req.path.startsWith(prefix)) {
-          if (mw.length >= 3) {
+          if (mw.length > 1) {
             return (mw as any)(req, res, next);
           } else {
             return (mw as any)({ req, res, next, request: req, response: res });

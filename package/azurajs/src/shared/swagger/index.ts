@@ -4,6 +4,7 @@ import type { SwaggerConfig } from "../../types/swagger.type";
 import { readFileSync, existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { getControllerMetadata, applyDecorators } from "../../decorators/Route";
+import type { RequestServer, ResponseServer } from "../../types";
 
 export class SwaggerIntegration {
   private generator: SwaggerGenerator;
@@ -17,13 +18,13 @@ export class SwaggerIntegration {
   public setup(): void {
     const config = this.generator.getConfig();
 
-    this.app.get(`/api-spec.json`, (_req: any, res: any) => {
+    this.app.get(`/api-spec.json`, (req: RequestServer, res: ResponseServer) => {
       res.json(this.generator.getDocument());
     });
 
     if (!config.uiEnabled) return;
-    
-    this.app.get(config.path, (_req: any, res: any) => {
+
+    this.app.get(config.path, (req: RequestServer, res: ResponseServer) => {
       try {
         const require = createRequire(import.meta.url);
         const htmlPath = require.resolve("azurajs/swagger-ui");
