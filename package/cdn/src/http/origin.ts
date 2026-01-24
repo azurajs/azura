@@ -12,16 +12,21 @@ export function streamFromOrigin(
     stream: NodeJS.ReadableStream,
   ) => void,
   onError: (err: Error) => void,
-) {
-  const u = new URL(pathname, originBase);
-  const lib = u.protocol === "https:" ? https : http;
-  const opts = { method: "GET", headers: { ...reqHeaders } };
-  const r = lib.request(u, opts, (originRes: http.IncomingMessage) => {
+): http.ClientRequest {
+  const url = new URL(pathname, originBase);
+  const lib = url.protocol === "https:" ? https : http;
+
+  const headers = { ...reqHeaders };
+  delete headers.host;
+
+  const opts = { method: "GET", headers };
+
+  const request = lib.request(url, opts, (originRes: http.IncomingMessage) => {
     onResponse(originRes.statusCode || 200, originRes.headers, originRes);
   });
-  
-  r.on("error", (e) => onError(e));
-  r.end();
 
-  return r;
+  request.on("error", (e) => onError(e));
+  request.end();
+
+  return request;
 }
