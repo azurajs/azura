@@ -1,6 +1,6 @@
 {
   "name": "azurajs",
-  "version": "2.6.1",
+  "version": "2.6.1-1",
   "description": "Modern TypeScript-first web framework with decorator-based routing, zero dependencies, and built for performance",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

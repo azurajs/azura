@@ -16,6 +16,7 @@ export type ConfigTypes = {
   server?: {
     port?: number;
     cluster?: boolean;
+    clusterInstances?: number;
     ipHost?: boolean;
     https?: boolean;
     /**

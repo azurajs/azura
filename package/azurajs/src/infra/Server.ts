@@ -1,5 +1,5 @@
 import http from "node:http";
-import cluster from "node:cluster";
+import cluster, { worker } from "node:cluster";
 import os from "node:os";
 
 import { ConfigModule } from "../shared/config/ConfigModule";
@@ -75,8 +75,12 @@ export class AzuraClient {
     this.port = this.opts.server?.port || 3000;
 
     if (this.opts.server?.cluster && cluster.isPrimary) {
-      const cpus = os.cpus().length;
-      for (let i = 0; i < cpus; i++) cluster.fork();
+      const cpuCount = os.cpus().length;
+      const desired = this.opts.server.clusterInstances ?? 2;
+
+      const workers = desired > cpuCount ? 2 : Math.max(1, desired);
+
+      for (let i = 0; i < workers; i++) cluster.fork();
       cluster.on("exit", () => cluster.fork());
       return;
     }
