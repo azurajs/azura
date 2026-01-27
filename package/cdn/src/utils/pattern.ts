@@ -52,7 +52,7 @@ export function matchesRoutePattern(path: string, pattern: string): boolean {
       return false;
     }
 
-    if (patternSeg.startsWith(":")) {
+    if (patternSeg?.startsWith(":")) {
       continue;
     }
 

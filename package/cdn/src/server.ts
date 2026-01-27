@@ -1,11 +1,6 @@
 import http from "http";
 import { URL } from "url";
-import type {
-  CacheEntry,
-  CDNConfig,
-  PurgeOptions,
-  WarmOptions,
-} from "./types/common.js";
+import type { CacheEntry, CDNConfig, PurgeOptions, WarmOptions } from "./types/common.js";
 import { MemoryCache } from "./cache/memory.js";
 import { DiskCache } from "./cache/disk.js";
 import { generateSignedUrl, verifySignedQuery } from "./http/signer.js";
@@ -38,9 +33,7 @@ export function createServer(config: CDNConfig) {
   function getClientIp(req: http.IncomingMessage): string {
     const forwarded = req.headers["x-forwarded-for"];
     if (forwarded) {
-      return (Array.isArray(forwarded) ? forwarded[0] : forwarded)
-        .split(",")[0]
-        .trim();
+      return (Array.isArray(forwarded) ? forwarded[0] : forwarded)!.split(",")[0]!.trim();
     }
     return req.socket.remoteAddress || "unknown";
   }
@@ -90,14 +83,7 @@ export function createServer(config: CDNConfig) {
       const expiresStr = urlObj.searchParams.get("expires") || undefined;
       const sig = urlObj.searchParams.get("sig") || undefined;
 
-      if (
-        !verifySignedQuery(
-          pathname || "/",
-          config.signedUrls.secret,
-          expiresStr,
-          sig,
-        )
-      ) {
+      if (!verifySignedQuery(pathname || "/", config.signedUrls.secret, expiresStr, sig)) {
         res.writeHead(403, { "content-type": "application/json" });
         res.end(
           JSON.stringify({
@@ -267,13 +253,7 @@ export function createServer(config: CDNConfig) {
       const cdnMetrics = metrics.getSummary();
 
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(
-        JSON.stringify(
-          { memory: memStats, disk: diskStats, metrics: cdnMetrics },
-          null,
-          2,
-        ),
-      );
+      res.end(JSON.stringify({ memory: memStats, disk: diskStats, metrics: cdnMetrics }, null, 2));
       return;
     }
 
@@ -345,10 +325,7 @@ export function createServer(config: CDNConfig) {
   const server = http.createServer(handle);
 
   return {
-    listen(
-      port = config.server?.port ?? 3001,
-      host = config.server?.host ?? "0.0.0.0",
-    ) {
+    listen(port = config.server?.port ?? 3001, host = config.server?.host ?? "0.0.0.0") {
       server.listen(port, host, () => {
         console.log(`🌐 CDN running at http://${host}:${port}`);
         console.log(`   └─ Origin: ${config.origin}`);
@@ -369,9 +346,7 @@ export function createServer(config: CDNConfig) {
           );
         }
         if (config.rateLimit?.enabled) {
-          console.log(
-            `   └─ Rate limit: ${config.rateLimit.max}/${config.rateLimit.windowMs}ms`,
-          );
+          console.log(`   └─ Rate limit: ${config.rateLimit.max}/${config.rateLimit.windowMs}ms`);
         }
       });
     },

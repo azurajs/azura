@@ -40,9 +40,9 @@ export class CompressionHandler {
     if (size < this.options.minSize) return false;
     if (!contentType) return false;
 
-    const mimeType = contentType.split(";")[0].trim().toLowerCase();
+    const mimeType = contentType.split(";")[0]?.trim().toLowerCase();
     return this.options.mimeTypes.some((type) =>
-      mimeType.startsWith(type.toLowerCase()),
+      mimeType?.startsWith(type.toLowerCase()),
     );
   }
 

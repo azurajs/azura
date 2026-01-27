@@ -24,10 +24,7 @@ export function parseIfNoneMatch(header: string | undefined): string[] {
     .filter(Boolean);
 }
 
-export function etagMatches(
-  etag: string | undefined,
-  ifNoneMatch: string | undefined,
-): boolean {
+export function etagMatches(etag: string | undefined, ifNoneMatch: string | undefined): boolean {
   if (!etag || !ifNoneMatch) return false;
 
   if (ifNoneMatch.trim() === "*") return true;
@@ -42,9 +39,7 @@ export function etagMatches(
   });
 }
 
-export function parseIfModifiedSince(
-  header: string | undefined,
-): number | null {
+export function parseIfModifiedSince(header: string | undefined): number | null {
   if (!header) return null;
   const timestamp = Date.parse(header);
   return isNaN(timestamp) ? null : timestamp;
@@ -66,10 +61,7 @@ export function formatHttpDate(timestamp: number): string {
   return new Date(timestamp).toUTCString();
 }
 
-export function shouldReturn304(
-  req: http.IncomingMessage,
-  entry: CacheEntry,
-): boolean {
+export function shouldReturn304(req: http.IncomingMessage, entry: CacheEntry): boolean {
   const ifNoneMatch = req.headers["if-none-match"];
   const ifModifiedSince = req.headers["if-modified-since"];
 
@@ -105,10 +97,11 @@ export function create304Headers(entry: CacheEntry): Record<string, string> {
   if (entry.lastModified) {
     headers["last-modified"] = formatHttpDate(entry.lastModified);
   }
-  if (entry.headers["cache-control"]) {
-    headers["cache-control"] = Array.isArray(entry.headers["cache-control"])
-      ? entry.headers["cache-control"][0]
-      : entry.headers["cache-control"];
+  const cacheControl = entry.headers["cache-control"];
+  if (cacheControl) {
+    headers["cache-control"] = Array.isArray(cacheControl)
+      ? (cacheControl[0] ?? "")
+      : (cacheControl ?? "");
   }
 
   return headers;
