@@ -1,3 +1,17 @@
 export { cors } from "./CORSPlugin";
 export { rateLimit } from "./RateLimitPlugin";
 export { proxyPlugin, createProxyMiddleware } from "./ProxyPlugin";
+export { SSEManager, createSSEHandler } from "./SSEPlugin";
+export { compression } from "./CompressionPlugin";
+export { serveStatic } from "./StaticPlugin";
+export { helmet } from "./HelmetPlugin";
+export { csrf } from "./CSRFPlugin";
+export { multipart } from "./MultipartPlugin";
+export { timeout } from "./TimeoutPlugin";
+export { etag } from "./ETagPlugin";
+export { session } from "./SessionPlugin";
+export { jwtMiddleware, createJWT, verifyJWT } from "./JWTPlugin";
+export { bodyLimit } from "./BodyLimitPlugin";
+export { healthCheck } from "./HealthCheckPlugin";
+export { requestId } from "./RequestIdPlugin";
+export { circuitBreaker, CircuitBreaker } from "./CircuitBreakerPlugin";

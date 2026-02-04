@@ -19,6 +19,7 @@ import { rateLimit } from "../shared/plugins/RateLimitPlugin";
 import type { ProxyOptions } from "../types";
 import { proxyPlugin } from "../shared/plugins";
 import { composeHandlers } from "./utils/Compose";
+import { WebSocketServer } from "../shared/plugins/WebSocketPlugin";
 
 export { createLoggingMiddleware } from "../middleware/LoggingMiddleware";
 export { proxyPlugin, createProxyMiddleware } from "../shared/plugins/ProxyPlugin";
@@ -42,6 +43,8 @@ export class AzuraClient {
   private router: Router;
   private middlewares: RequestHandler[] = [];
   private proxies: Array<{ path: string; handler: RequestHandler }> = [];
+  private wsServer?: WebSocketServer;
+  private isShuttingDown: boolean = false;
 
   constructor() {
     const config = new ConfigModule();
@@ -99,7 +102,13 @@ export class AzuraClient {
       logger("info", "Rate Limit plugin enabled");
     }
 
-    this.server = http.createServer((req, res) => this.handle(req as any, res as any));
+    // Create server WITHOUT handler to allow upgrade events to work properly
+    this.server = http.createServer();
+    
+    // Add request handler manually
+    this.server.on('request', (req, res) => {
+      this.handle(req as any, res as any);
+    });
   }
 
   public use(prefix: string, mw: RequestHandler): void;
@@ -147,6 +156,12 @@ export class AzuraClient {
   public put = (p: string, ...h: RequestHandler[]) => this.addRoute("PUT", p, ...h);
   public delete = (p: string, ...h: RequestHandler[]) => this.addRoute("DELETE", p, ...h);
   public patch = (p: string, ...h: RequestHandler[]) => this.addRoute("PATCH", p, ...h);
+  public all = (p: string, ...h: RequestHandler[]) => {
+    const methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
+    for (const method of methods) {
+      this.addRoute(method, p, ...h);
+    }
+  };
 
   public proxy(path: string, target: string, options: Partial<ProxyOptions> = {}) {
     this.proxies.push({ path, handler: proxyPlugin(target, options) as RequestHandler });
@@ -190,6 +205,31 @@ export class AzuraClient {
     });
 
     return this.server;
+  }
+
+  public async shutdown(timeout: number = 10000): Promise<void> {
+    if (this.isShuttingDown) return;
+    this.isShuttingDown = true;
+
+    logger("info", "Starting graceful shutdown...");
+
+    return new Promise((resolve) => {
+      const forceShutdown = setTimeout(() => {
+        logger("warn", "Forcing shutdown after timeout");
+        process.exit(1);
+      }, timeout);
+
+      if (this.server) {
+        this.server.close(() => {
+          clearTimeout(forceShutdown);
+          logger("info", "Server closed successfully");
+          resolve();
+        });
+      } else {
+        clearTimeout(forceShutdown);
+        resolve();
+      }
+    });
   }
 
   public async fetch(request: Request): Promise<Response> {

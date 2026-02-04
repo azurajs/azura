@@ -7,15 +7,15 @@ export function cors(opts: CorsOptions) {
   return (ctx: HttpContext, next: () => Promise<void>) => {
     ctx.response.setHeader(
       "Access-Control-Allow-Origin",
-      Array.isArray(origin) ? origin.join(",") : origin
+      Array.isArray(origin) ? origin.join(",") : origin,
     );
     ctx.response.setHeader(
       "Access-Control-Allow-Methods",
-      Array.isArray(methods) ? methods.join(",") : methods
+      Array.isArray(methods) ? methods.join(",") : methods,
     );
     ctx.response.setHeader(
       "Access-Control-Allow-Headers",
-      Array.isArray(allowedHeaders) ? allowedHeaders.join(",") : allowedHeaders
+      Array.isArray(allowedHeaders) ? allowedHeaders.join(",") : allowedHeaders,
     );
 
     if (ctx.request.method === "OPTIONS") {

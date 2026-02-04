@@ -217,4 +217,13 @@ export class Router {
     const internalHandlers = handlers.map(adaptRouterHandler);
     this.add("PATCH", path, composeHandlers(internalHandlers));
   }
+
+  public all(path: string, ...handlers: RequestHandler[]): void {
+    const internalHandlers = handlers.map(adaptRouterHandler);
+    const composed = composeHandlers(internalHandlers);
+    const methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
+    for (const method of methods) {
+      this.add(method, path, composed);
+    }
+  }
 }
