@@ -19,7 +19,6 @@ import { rateLimit } from "../shared/plugins/RateLimitPlugin";
 import type { ProxyOptions } from "../types";
 import { proxyPlugin } from "../shared/plugins";
 import { composeHandlers } from "./utils/Compose";
-import { WebSocketServer } from "../shared/plugins/WebSocketPlugin";
 
 export { createLoggingMiddleware } from "../middleware/LoggingMiddleware";
 export { proxyPlugin, createProxyMiddleware } from "../shared/plugins/ProxyPlugin";
@@ -43,7 +42,6 @@ export class AzuraClient {
   private router: Router;
   private middlewares: RequestHandler[] = [];
   private proxies: Array<{ path: string; handler: RequestHandler }> = [];
-  private wsServer?: WebSocketServer;
   private isShuttingDown: boolean = false;
 
   constructor() {

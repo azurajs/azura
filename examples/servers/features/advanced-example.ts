@@ -46,22 +46,6 @@ app.get("/csrf-token", (req: any, res) => {
 
 const server = await app.listen(3000);
 
-const ws = app.websocket("/ws");
-
-ws.on("connect", (client) => {
-  console.log(`Client connected: ${client.id}`);
-  ws.send(client.id, JSON.stringify({ type: "welcome", message: "Connected to WebSocket" }));
-});
-
-ws.on("message", (client, message) => {
-  console.log(`Message from ${client.id}:`, message.toString());
-  ws.broadcast(JSON.stringify({ from: client.id, message: message.toString() }), client.id);
-});
-
-ws.on("close", (client) => {
-  console.log(`Client disconnected: ${client.id}`);
-});
-
 process.on("SIGTERM", async () => {
   await app.shutdown();
 });
