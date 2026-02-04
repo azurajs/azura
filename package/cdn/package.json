@@ -1,7 +1,7 @@
 {
   "name": "@azurajs/cdn",
   "version": "1.0.0",
-  "description": "Modern Typescript-first",
+  "description": "A full-featured CDN module for AzuraJS with caching, compression, signed URLs, and more.",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",

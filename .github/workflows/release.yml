@@ -5,23 +5,19 @@ on:
     types: [published]
 
 jobs:
-  publish:
+  publish-azurajs:
     runs-on: ubuntu-latest
+    if: contains(github.ref_name, '-azurajs')
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 18
           registry-url: https://registry.npmjs.org/
-      
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+
+      - uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
 
@@ -32,9 +28,39 @@ jobs:
       - name: Build
         working-directory: package/azurajs
         run: bun run build
-        
-      - name: Publish to npm
+
+      - name: Publish azurajs
         working-directory: package/azurajs
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-cdn:
+    runs-on: ubuntu-latest
+    if: contains(github.ref_name, '-cdn')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          registry-url: https://registry.npmjs.org/
+
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: package/cdn
+        run: bun install
+
+      - name: Build
+        working-directory: package/cdn
+        run: bun run build
+
+      - name: Publish cdn
+        working-directory: package/cdn
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
