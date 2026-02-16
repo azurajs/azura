@@ -45,6 +45,7 @@ export type ConfigTypes = {
       origins: string | string[];
       methods: string | string[];
       allowedHeaders: string | string[];
+      credentials: boolean;
     };
   };
   logging?: {
