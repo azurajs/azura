@@ -87,17 +87,26 @@ export class AzuraClient {
     }
 
     if (this.opts.plugins?.cors?.enabled) {
-      cors({
+      const corsPlugin = cors({
         origin: this.opts.plugins.cors.origins,
         methods: this.opts.plugins.cors.methods,
         allowedHeaders: this.opts.plugins.cors.allowedHeaders,
         credentials: this.opts.plugins.cors.credentials,
       });
+
+      this.middlewares.unshift((ctx: any) => corsPlugin(ctx, ctx.next));
       logger("info", "CORS plugin enabled");
     }
 
     if (this.opts.plugins?.rateLimit?.enabled) {
-      rateLimit(this.opts.plugins.rateLimit.limit, this.opts.plugins.rateLimit.timeframe);
+      const rateLimitPlugin = rateLimit(
+        this.opts.plugins.rateLimit.limit,
+        this.opts.plugins.rateLimit.timeframe,
+      );
+
+      if (typeof rateLimitPlugin === "function") {
+        this.middlewares.unshift((ctx: any) => rateLimitPlugin(ctx, ctx.next));
+      }
       logger("info", "Rate Limit plugin enabled");
     }
 
