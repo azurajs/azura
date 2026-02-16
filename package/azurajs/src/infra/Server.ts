@@ -91,6 +91,7 @@ export class AzuraClient {
         origin: this.opts.plugins.cors.origins,
         methods: this.opts.plugins.cors.methods,
         allowedHeaders: this.opts.plugins.cors.allowedHeaders,
+        credentials: this.opts.plugins.cors.credentials,
       });
       logger("info", "CORS plugin enabled");
     }
@@ -102,9 +103,9 @@ export class AzuraClient {
 
     // Create server WITHOUT handler to allow upgrade events to work properly
     this.server = http.createServer();
-    
+
     // Add request handler manually
-    this.server.on('request', (req, res) => {
+    this.server.on("request", (req, res) => {
       this.handle(req as any, res as any);
     });
   }
