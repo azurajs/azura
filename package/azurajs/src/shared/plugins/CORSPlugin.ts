@@ -1,6 +1,36 @@
 import type { HttpContext } from "../../types/common.type";
 import type { CorsOptions } from "../../types/plugins/cors.type";
 
+function setHeader(res: any, key: string, value: string) {
+  if (!res) return;
+  if (typeof res.set === "function") return res.set(key, value);
+  if (typeof res.setHeader === "function") return res.setHeader(key, value);
+  if (typeof res.header === "function") return res.header(key, value);
+  return;
+}
+
+function endResponse(res: any) {
+  if (!res) return;
+  if (typeof res.end === "function") {
+    if (typeof res.statusCode === "number") res.statusCode = 204;
+    setHeader(res, "Content-Length", "0");
+    return res.end();
+  }
+  if (typeof res.send === "function") {
+    if (typeof res.status === "function") res.status(204);
+    setHeader(res, "Content-Length", "0");
+    return res.send();
+  }
+  if (typeof res.status === "function") {
+    res.status(204);
+    setHeader(res, "Content-Length", "0");
+  } else {
+    if (typeof res.statusCode === "number") res.statusCode = 204;
+    setHeader(res, "Content-Length", "0");
+  }
+  return;
+}
+
 export function cors(opts: CorsOptions) {
   const allowedOrigin = opts.origin ?? "*";
   const methods = opts.methods ?? "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS";
@@ -9,43 +39,51 @@ export function cors(opts: CorsOptions) {
   const credentials = opts.credentials === true;
 
   return async (ctx: HttpContext, next: () => Promise<void>) => {
-    const requestOrigin = ctx.request.headers["origin"] as string;
+    const reqHeaders = (ctx.request && (ctx.request.headers || {})) || {};
+    const requestOrigin =
+      typeof ctx.request.get === "function"
+        ? ctx.request.get("origin")
+        : reqHeaders["origin"] || reqHeaders["Origin"] || "";
 
     if (allowedOrigin === "*") {
       if (credentials && requestOrigin) {
-        ctx.response.setHeader("Access-Control-Allow-Origin", requestOrigin);
+        setHeader(
+          ctx.response,
+          "Access-Control-Allow-Origin",
+          Array.isArray(requestOrigin) ? requestOrigin.join(",") : requestOrigin,
+        );
       } else {
-        ctx.response.setHeader("Access-Control-Allow-Origin", "*");
+        setHeader(ctx.response, "Access-Control-Allow-Origin", "*");
       }
     } else if (Array.isArray(allowedOrigin)) {
-      if (requestOrigin && allowedOrigin.includes(requestOrigin)) {
-        ctx.response.setHeader("Access-Control-Allow-Origin", requestOrigin);
+      const originStr = Array.isArray(requestOrigin) ? requestOrigin[0] : requestOrigin;
+      if (originStr && allowedOrigin.includes(originStr)) {
+        setHeader(ctx.response, "Access-Control-Allow-Origin", originStr);
       }
     } else if (allowedOrigin) {
-      ctx.response.setHeader("Access-Control-Allow-Origin", allowedOrigin as string);
+      setHeader(ctx.response, "Access-Control-Allow-Origin", allowedOrigin as string);
     }
 
     if (credentials) {
-      ctx.response.setHeader("Access-Control-Allow-Credentials", "true");
+      setHeader(ctx.response, "Access-Control-Allow-Credentials", "true");
     }
 
-    ctx.response.setHeader(
+    setHeader(
+      ctx.response,
       "Access-Control-Allow-Methods",
       Array.isArray(methods) ? methods.join(",") : methods,
     );
 
-    ctx.response.setHeader(
+    setHeader(
+      ctx.response,
       "Access-Control-Allow-Headers",
       Array.isArray(allowedHeaders) ? allowedHeaders.join(",") : allowedHeaders,
     );
 
-    ctx.response.setHeader("Vary", "Origin");
+    setHeader(ctx.response, "Vary", "Origin");
 
-    if (ctx.request.method === "OPTIONS") {
-      ctx.response.statusCode = 204;
-      ctx.response.setHeader("Content-Length", "0");
-      ctx.response.end();
-      return;
+    if ((ctx.request && ctx.request.method === "OPTIONS") || ctx.request.method === "OPTIONS") {
+      return endResponse(ctx.response);
     }
 
     return next();

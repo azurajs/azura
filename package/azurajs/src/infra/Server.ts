@@ -1,5 +1,5 @@
 import http from "node:http";
-import cluster, { worker } from "node:cluster";
+import cluster from "node:cluster";
 import os from "node:os";
 
 import { ConfigModule } from "../shared/config/ConfigModule";
@@ -26,7 +26,7 @@ export { proxyPlugin, createProxyMiddleware } from "../shared/plugins/ProxyPlugi
 function adaptRequestHandler(handler: RequestHandler): InternalHandler {
   return async (ctx) => {
     if (typeof handler !== "function") return;
-    if (handler.length > 1) {
+    if ((handler as any).length > 1) {
       return (handler as any)(ctx.req, ctx.res, ctx.next);
     } else {
       return (handler as any)(ctx);
@@ -110,10 +110,8 @@ export class AzuraClient {
       logger("info", "Rate Limit plugin enabled");
     }
 
-    // Create server WITHOUT handler to allow upgrade events to work properly
     this.server = http.createServer();
 
-    // Add request handler manually
     this.server.on("request", (req, res) => {
       this.handle(req as any, res as any);
     });
@@ -332,7 +330,9 @@ export class AzuraClient {
         return rawRes;
       },
       send: (b: any) => {
-        if (typeof b === "object") {
+        if (b === undefined || b === null) {
+          body = "";
+        } else if (typeof b === "object") {
           headers.set("Content-Type", "application/json");
           body = JSON.stringify(b);
         } else {
@@ -348,6 +348,24 @@ export class AzuraClient {
     };
 
     try {
+      if (request.method.toUpperCase() === "OPTIONS") {
+        const chain = [...this.middlewares.map(adaptRequestHandler)];
+        let idx = 0;
+        const middlewareNext = async (err?: any) => {
+          if (err) throw err;
+          if (idx >= chain.length) return;
+          const fn = chain[idx++];
+          if (!fn) return;
+          await fn({ req: rawReq, res: rawRes, next: middlewareNext });
+        };
+        await middlewareNext();
+        if (body === null) {
+          statusCode = 204;
+          body = "";
+        }
+        return new Response(body, { status: statusCode, headers });
+      }
+
       const match = this.router.find(rawReq.method, rawReq.path);
       if (!match) return new Response("Not Found", { status: 404 });
 
@@ -581,6 +599,29 @@ export class AzuraClient {
             return;
           }
         }
+      }
+
+      if (method === "OPTIONS") {
+        const chain = this.middlewares.map(adaptRequestHandler);
+        let idx = 0;
+        const middlewareNext = async (err?: any) => {
+          if (err) return errorHandler(err);
+          if (idx >= chain.length) return;
+          const fn = chain[idx++];
+          if (!fn) return;
+          try {
+            await fn({ req: rawReq, res: rawRes, next: middlewareNext });
+          } catch (e) {
+            return errorHandler(e);
+          }
+        };
+        await middlewareNext();
+        if (!rawRes.writableEnded) {
+          rawRes.statusCode = 204;
+          rawRes.setHeader("Content-Length", "0");
+          rawRes.end();
+        }
+        return;
       }
 
       const match = this.router.find(method, path);
